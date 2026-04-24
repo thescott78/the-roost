@@ -2,105 +2,507 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#1a1a1a">
     <title>Burner Compass</title>
     <link rel="manifest" href="manifest.json">
     <style>
-        body { margin: 0; background: #1a1a1a; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
-        #arrow { width: 200px; height: 200px; transition: transform 0.2s ease-out; }
-        #distance { font-size: 2rem; font-weight: bold; margin-top: 20px; }
-        #status { font-size: 0.8rem; color: #888; margin-top: 10px; text-align: center; padding: 0 20px; }
-        .btn { background: #ff4500; color: white; border: none; padding: 15px 30px; border-radius: 30px; font-size: 1rem; cursor: pointer; margin-top: 20px; }
+        :root {
+            --bg: #1a1a1a;
+            --fg: #ffffff;
+            --muted: #888;
+            --accent: #ff4500;
+            --ring-1: #4a90e2;
+            --ring-2: #00bcd4;
+            --ring-3: #8bc34a;
+            --ring-4: #ffc107;
+            --ring-5: #ff5722;
+            --ring-6: #ff1744;
+        }
+        body.night {
+            --bg: #000;
+            --fg: #ff2a2a;
+            --muted: #992020;
+            --accent: #ff2a2a;
+            --ring-1: #3a0000;
+            --ring-2: #550000;
+            --ring-3: #770000;
+            --ring-4: #990000;
+            --ring-5: #cc0000;
+            --ring-6: #ff2a2a;
+        }
+        * { box-sizing: border-box; }
+        html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
+        body {
+            background: var(--bg); color: var(--fg);
+            font-family: -apple-system, system-ui, sans-serif;
+            display: flex; flex-direction: column; align-items: center;
+            padding: env(safe-area-inset-top) 16px env(safe-area-inset-bottom) 16px;
+            user-select: none; -webkit-user-select: none;
+            transition: background 0.3s, color 0.3s;
+        }
+        body.arrived { animation: arrived-pulse 1.5s infinite; }
+        @keyframes arrived-pulse { 0%, 100% { background: var(--bg); } 50% { background: #330a00; } }
+        body.night.arrived { animation: none; }
+
+        #topbar {
+            width: 100%; display: flex; justify-content: space-between;
+            padding: 12px 4px; font-size: 0.9rem;
+        }
+        .chip {
+            background: transparent; color: var(--fg); border: 1px solid var(--muted);
+            padding: 8px 14px; border-radius: 20px; font-size: 0.85rem; cursor: pointer;
+        }
+
+        #compass-wrap {
+            position: relative; width: min(85vw, 380px); aspect-ratio: 1;
+            display: flex; align-items: center; justify-content: center;
+            margin-top: 8px;
+        }
+        .ring {
+            position: absolute; border-radius: 50%; border: 2px solid;
+            opacity: 0; pointer-events: none;
+        }
+        .ring.active { animation: pulse 2s ease-out infinite; }
+        @keyframes pulse {
+            0%   { transform: scale(0.4); opacity: 0.9; }
+            100% { transform: scale(1.0); opacity: 0; }
+        }
+        #r1 { width: 100%; height: 100%; border-color: var(--ring-current, var(--ring-1)); animation-delay: 0s; }
+        #r2 { width: 100%; height: 100%; border-color: var(--ring-current, var(--ring-1)); animation-delay: 0.66s; }
+        #r3 { width: 100%; height: 100%; border-color: var(--ring-current, var(--ring-1)); animation-delay: 1.33s; }
+
+        #arrow {
+            width: 55%; height: 55%;
+            transition: transform 0.15s ease-out;
+            filter: drop-shadow(0 0 12px var(--ring-current, var(--accent)));
+        }
+        #arrow.stale { opacity: 0.35; }
+        #arrow polygon { fill: var(--ring-current, var(--accent)); transition: fill 0.4s; }
+
+        #distance {
+            font-size: 3rem; font-weight: 800; margin-top: 18px;
+            letter-spacing: -1px;
+        }
+        #distance.arrived { color: var(--ring-6) !important; }
+        #meta {
+            font-size: 0.9rem; color: var(--muted);
+            margin-top: 4px; text-align: center;
+        }
+        #meta .warn { color: var(--ring-5); }
+        #status {
+            font-size: 0.75rem; color: var(--muted); margin-top: 6px;
+            text-align: center; min-height: 1em;
+        }
+
+        #trail {
+            width: min(85vw, 380px); height: 90px; margin-top: 14px;
+            border: 1px solid var(--muted); border-radius: 10px;
+            opacity: 0.7;
+        }
+
+        #controls {
+            display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap;
+            justify-content: center;
+        }
+        .btn {
+            background: var(--accent); color: var(--bg);
+            border: none; padding: 14px 22px; border-radius: 28px;
+            font-size: 1rem; font-weight: 700; cursor: pointer;
+        }
+        body.night .btn { background: var(--fg); color: #000; }
+        .btn.secondary { background: transparent; color: var(--fg); border: 1px solid var(--muted); font-weight: 500; }
+
+        #calib {
+            position: fixed; left: 0; right: 0; bottom: 80px; margin: 0 auto;
+            width: max-content; max-width: 90%;
+            background: var(--ring-4); color: #000; padding: 10px 16px;
+            border-radius: 20px; font-size: 0.85rem; font-weight: 600;
+            display: none;
+        }
+        #calib.show { display: block; }
+
+        /* SOS modal */
+        #sos {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.96);
+            display: none; flex-direction: column; align-items: center; justify-content: center;
+            padding: 24px; z-index: 10;
+        }
+        #sos.show { display: flex; }
+        #sos h2 { font-size: 1.2rem; margin: 0 0 20px; color: var(--muted); font-weight: 500; }
+        #sos .coord { font-size: 2.4rem; font-weight: 800; letter-spacing: 1px; margin: 6px 0; text-align: center; }
+        #sos .label { font-size: 0.8rem; color: var(--muted); margin-top: 16px; }
+        #sos .close { margin-top: 36px; }
+
+        /* confetti */
+        .confetti {
+            position: fixed; top: -10px; width: 10px; height: 14px;
+            will-change: transform; pointer-events: none; z-index: 5;
+        }
+        @keyframes fall {
+            to { transform: translateY(110vh) rotate(720deg); }
+        }
     </style>
 </head>
 <body>
 
+<div id="topbar">
+    <button class="chip" id="nightBtn">Night</button>
+    <button class="chip" id="sosBtn">Where am I?</button>
+</div>
+
+<div id="compass-wrap">
+    <div class="ring" id="r1"></div>
+    <div class="ring" id="r2"></div>
+    <div class="ring" id="r3"></div>
     <svg id="arrow" viewBox="0 0 100 100">
-        <polygon points="50,5 95,95 50,75 5,95" fill="#ff4500" />
+        <polygon points="50,5 95,95 50,75 5,95" />
     </svg>
+</div>
 
-    <div id="distance">Finding Camp...</div>
-    <div id="status">Waiting for GPS...</div>
-    <button class="btn" onclick="startCompass()">Start Compass</button>
+<div id="distance">Finding Camp…</div>
+<div id="meta"><span id="accuracy"></span><span id="eta"></span></div>
+<div id="status">Tap Start to begin</div>
 
-    <script>
-        const TARGET_LAT = -32.517363;
-        const TARGET_LON = 19.949305;
-        
-        let userLat, userLon, deviceHeading = 0;
+<svg id="trail" viewBox="-50 -50 100 100" preserveAspectRatio="xMidYMid meet">
+    <circle cx="0" cy="0" r="2" fill="var(--accent)" />
+</svg>
 
-        function toRad(deg) { return deg * Math.PI / 180; }
-        function toDeg(rad) { return rad * 180 / Math.PI; }
+<div id="controls">
+    <button class="btn" id="startBtn">Start Compass</button>
+    <button class="btn secondary" id="setCampBtn">Set camp here</button>
+</div>
 
-        // Distance Calculation (Haversine)
-        function getDistance(lat1, lon1, lat2, lon2) {
-            const R = 6371000; // Earth radius in meters
-            const dLat = toRad(lat2 - lat1);
-            const dLon = toRad(lon2 - lon1);
-            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * 
-                      Math.sin(dLon/2) * Math.sin(dLon/2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-            return R * c;
+<div id="calib">📱 Wave phone in a figure-8 to calibrate compass</div>
+
+<div id="sos">
+    <h2>Read these to camp radio</h2>
+    <div class="label">Latitude</div>
+    <div class="coord" id="sosLat">—</div>
+    <div class="label">Longitude</div>
+    <div class="coord" id="sosLon">—</div>
+    <div class="label" id="sosAcc"></div>
+    <button class="btn close" id="sosClose">Close</button>
+</div>
+
+<script>
+(() => {
+    const DEFAULT_TARGET = { lat: -32.517363, lon: 19.949305 };
+    const saved = JSON.parse(localStorage.getItem('camp') || 'null');
+    let target = saved || DEFAULT_TARGET;
+
+    let userLat = null, userLon = null, userAcc = null;
+    let deviceHeading = null;
+    let compassAccuracy = null; // degrees, -1 = unreliable (iOS)
+    let lastFix = 0;
+    let speedSamples = []; // {t, lat, lon}
+    let trailPoints = [];  // last N {lat, lon}
+    const TRAIL_MAX = 60;
+    let hapticTimer = null;
+    let lastHapticInterval = 0;
+    let arrived = false;
+
+    const $ = (id) => document.getElementById(id);
+
+    const toRad = (d) => d * Math.PI / 180;
+    const toDeg = (r) => r * 180 / Math.PI;
+
+    function haversine(lat1, lon1, lat2, lon2) {
+        const R = 6371000;
+        const dLat = toRad(lat2 - lat1);
+        const dLon = toRad(lon2 - lon1);
+        const a = Math.sin(dLat/2)**2 +
+                  Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+
+    function bearing(lat1, lon1, lat2, lon2) {
+        const y = Math.sin(toRad(lon2 - lon1)) * Math.cos(toRad(lat2));
+        const x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
+                  Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(toRad(lon2 - lon1));
+        return (toDeg(Math.atan2(y, x)) + 360) % 360;
+    }
+
+    // Color zones by distance (meters)
+    function zoneFor(dist) {
+        if (dist > 1000) return { name: '1', color: 'var(--ring-1)', pulse: 2.4, hap: 0 };
+        if (dist > 500)  return { name: '2', color: 'var(--ring-2)', pulse: 2.0, hap: 2500 };
+        if (dist > 200)  return { name: '3', color: 'var(--ring-3)', pulse: 1.6, hap: 1500 };
+        if (dist > 75)   return { name: '4', color: 'var(--ring-4)', pulse: 1.2, hap: 800 };
+        if (dist > 25)   return { name: '5', color: 'var(--ring-5)', pulse: 0.8, hap: 400 };
+        return               { name: '6', color: 'var(--ring-6)', pulse: 0.5, hap: 180 };
+    }
+
+    function setHaptic(intervalMs) {
+        if (intervalMs === lastHapticInterval) return;
+        lastHapticInterval = intervalMs;
+        if (hapticTimer) { clearInterval(hapticTimer); hapticTimer = null; }
+        if (!intervalMs || !navigator.vibrate) return;
+        hapticTimer = setInterval(() => navigator.vibrate(60), intervalMs);
+    }
+
+    function formatDist(m) {
+        return m >= 1000 ? (m/1000).toFixed(2) + ' km' : Math.round(m) + ' m';
+    }
+
+    // Smooth speed estimate from recent fixes (m/s)
+    function estimateSpeed() {
+        if (speedSamples.length < 2) return 0;
+        const now = speedSamples[speedSamples.length - 1];
+        const then = speedSamples[0];
+        const dt = (now.t - then.t) / 1000;
+        if (dt < 2) return 0;
+        const d = haversine(then.lat, then.lon, now.lat, now.lon);
+        return d / dt;
+    }
+
+    function updateTrail() {
+        const svg = $('trail');
+        // Keep static camp dot, clear old trail lines
+        [...svg.querySelectorAll('.tp')].forEach(n => n.remove());
+        if (!trailPoints.length) return;
+
+        // Project relative to camp, using a simple equirectangular scale
+        const latRad = toRad(target.lat);
+        const mPerDegLat = 111320;
+        const mPerDegLon = 111320 * Math.cos(latRad);
+
+        let maxR = 1;
+        const projected = trailPoints.map(p => {
+            const x = (p.lon - target.lon) * mPerDegLon;
+            const y = -(p.lat - target.lat) * mPerDegLat; // invert y so north is up
+            const r = Math.hypot(x, y);
+            if (r > maxR) maxR = r;
+            return { x, y };
+        });
+
+        const scale = 45 / maxR;
+        const ns = 'http://www.w3.org/2000/svg';
+        const pts = projected.map(p => `${(p.x*scale).toFixed(1)},${(p.y*scale).toFixed(1)}`).join(' ');
+        const poly = document.createElementNS(ns, 'polyline');
+        poly.setAttribute('points', pts);
+        poly.setAttribute('fill', 'none');
+        poly.setAttribute('stroke', 'var(--ring-current, #888)');
+        poly.setAttribute('stroke-width', '1.2');
+        poly.setAttribute('stroke-linejoin', 'round');
+        poly.setAttribute('class', 'tp');
+        svg.appendChild(poly);
+
+        const last = projected[projected.length - 1];
+        const you = document.createElementNS(ns, 'circle');
+        you.setAttribute('cx', (last.x*scale).toFixed(1));
+        you.setAttribute('cy', (last.y*scale).toFixed(1));
+        you.setAttribute('r', '2.2');
+        you.setAttribute('fill', 'var(--ring-current, #fff)');
+        you.setAttribute('class', 'tp');
+        svg.appendChild(you);
+    }
+
+    function celebrate() {
+        if (arrived) return;
+        arrived = true;
+        document.body.classList.add('arrived');
+        $('distance').classList.add('arrived');
+        $('distance').textContent = "You're home!";
+        if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 400]);
+        for (let i = 0; i < 50; i++) {
+            const c = document.createElement('div');
+            c.className = 'confetti';
+            c.style.left = Math.random() * 100 + 'vw';
+            const colors = ['#ff4500','#ffc107','#8bc34a','#00bcd4','#ff1744'];
+            c.style.background = colors[i % colors.length];
+            c.style.animation = `fall ${2 + Math.random()*2}s linear ${Math.random()*0.8}s forwards`;
+            c.style.transform = `rotate(${Math.random()*360}deg)`;
+            document.body.appendChild(c);
+            setTimeout(() => c.remove(), 5000);
+        }
+    }
+
+    function unCelebrate() {
+        arrived = false;
+        document.body.classList.remove('arrived');
+        $('distance').classList.remove('arrived');
+    }
+
+    function updateUI() {
+        if (userLat == null) return;
+
+        const dist = haversine(userLat, userLon, target.lat, target.lon);
+        const brg = bearing(userLat, userLon, target.lat, target.lon);
+        const zone = zoneFor(dist);
+
+        document.documentElement.style.setProperty('--ring-current', zone.color);
+
+        // Rings pulse speed
+        ['r1','r2','r3'].forEach(id => {
+            const el = $(id);
+            el.classList.add('active');
+            el.style.animationDuration = zone.pulse + 's';
+        });
+
+        // Arrow rotation: bearing - heading. If no heading, arrow points "up" as if facing north.
+        const heading = deviceHeading ?? 0;
+        const screenAngle = (screen.orientation && screen.orientation.angle) || 0;
+        const rotation = brg - heading + screenAngle;
+        const arrow = $('arrow');
+        arrow.style.transform = `rotate(${rotation}deg)`;
+        arrow.classList.toggle('stale', deviceHeading == null);
+
+        // Distance with hysteresis so confetti doesn't retrigger on wobble
+        if (dist <= 15 && !arrived) {
+            celebrate();
+        } else if (dist > 30 && arrived) {
+            unCelebrate();
+            $('distance').textContent = formatDist(dist);
+        } else if (!arrived) {
+            $('distance').textContent = formatDist(dist);
         }
 
-        // Bearing Calculation
-        function getBearing(lat1, lon1, lat2, lon2) {
-            const y = Math.sin(toRad(lon2 - lon1)) * Math.cos(toRad(lat2));
-            const x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
-                      Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(toRad(lon2 - lon1));
-            return (toDeg(Math.atan2(y, x)) + 360) % 360;
+        // Accuracy + ETA
+        let accText = '';
+        if (userAcc != null) {
+            const warn = userAcc > 30 ? ' warn' : '';
+            accText = `<span class="${warn.trim()}">±${Math.round(userAcc)}m</span>`;
         }
-
-        function updateUI() {
-            if (!userLat || !userLon) return;
-
-            const dist = getDistance(userLat, userLon, TARGET_LAT, TARGET_LON);
-            const bearing = getBearing(userLat, userLon, TARGET_LAT, TARGET_LON);
-            
-            // The arrow rotation needs to be: Target Bearing - Device Heading
-            const arrowRotation = bearing - deviceHeading;
-            document.getElementById('arrow').style.transform = `rotate(${arrowRotation}deg)`;
-            
-            document.getElementById('distance').innerText = dist > 1000 ? 
-                (dist/1000).toFixed(2) + " km" : Math.round(dist) + " m";
-            document.getElementById('status').innerText = `Your GPS: ${userLat.toFixed(5)}, ${userLon.toFixed(5)}`;
-        }
-
-        function startCompass() {
-            // Request permission for iOS 13+
-            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-                DeviceOrientationEvent.requestPermission()
-                    .then(response => { if (response == 'granted') window.addEventListener('deviceorientation', handleOrientation, true); })
-                    .catch(console.error);
-            } else {
-                window.addEventListener('deviceorientationabsolute', handleOrientation, true);
-                window.addEventListener('deviceorientation', handleOrientation, true);
+        const speed = estimateSpeed();
+        let etaText = '';
+        if (speed > 0.3 && dist > 15) {
+            const eta = dist / speed;
+            if (eta < 3600) {
+                const mins = Math.max(1, Math.round(eta / 60));
+                etaText = ` · ~${mins} min`;
             }
+        }
+        $('accuracy').innerHTML = accText;
+        $('eta').innerHTML = etaText;
 
-            navigator.geolocation.watchPosition(pos => {
-                userLat = pos.coords.latitude;
-                userLon = pos.coords.longitude;
-                updateUI();
-            }, err => {
-                document.getElementById('status').innerText = "GPS Error: " + err.message;
-            }, { enableHighAccuracy: true });
+        // Status
+        const heads = deviceHeading == null ? 'no compass' : `heading ${Math.round(heading)}°`;
+        $('status').textContent = `GPS ${userLat.toFixed(5)}, ${userLon.toFixed(5)} · ${heads}`;
+
+        // Haptics
+        setHaptic(zone.hap);
+
+        // Calibration warning
+        const badCompass = compassAccuracy === -1 || (compassAccuracy != null && compassAccuracy > 25);
+        $('calib').classList.toggle('show', badCompass);
+
+        updateTrail();
+    }
+
+    function onPosition(pos) {
+        userLat = pos.coords.latitude;
+        userLon = pos.coords.longitude;
+        userAcc = pos.coords.accuracy;
+        lastFix = Date.now();
+
+        const sample = { t: lastFix, lat: userLat, lon: userLon };
+        speedSamples.push(sample);
+        // keep ~30s of samples
+        while (speedSamples.length > 1 && lastFix - speedSamples[0].t > 30000) speedSamples.shift();
+
+        const lastPt = trailPoints[trailPoints.length - 1];
+        if (!lastPt || haversine(lastPt.lat, lastPt.lon, userLat, userLon) > 3) {
+            trailPoints.push({ lat: userLat, lon: userLon });
+            if (trailPoints.length > TRAIL_MAX) trailPoints.shift();
         }
 
-        function handleOrientation(event) {
-            // Handle iOS vs Android heading
-            if (event.webkitCompassHeading) {
-                deviceHeading = event.webkitCompassHeading;
-            } else if (event.absolute === true || event.alpha !== null) {
-                deviceHeading = 360 - event.alpha; // Android
+        updateUI();
+    }
+
+    function onPositionError(err) {
+        $('status').textContent = 'GPS error: ' + err.message;
+    }
+
+    function handleOrientation(event) {
+        if (event.webkitCompassHeading != null) {
+            deviceHeading = event.webkitCompassHeading;
+            compassAccuracy = event.webkitCompassAccuracy;
+        } else if (event.absolute === true && event.alpha != null) {
+            deviceHeading = (360 - event.alpha) % 360;
+            compassAccuracy = null;
+        } else if (event.alpha != null && deviceHeading == null) {
+            // Non-absolute fallback — heading is unreliable but better than nothing
+            deviceHeading = (360 - event.alpha) % 360;
+            compassAccuracy = 45; // flag as low confidence
+        } else if (event.alpha != null) {
+            deviceHeading = (360 - event.alpha) % 360;
+        }
+        updateUI();
+    }
+
+    async function startCompass() {
+        $('startBtn').style.display = 'none';
+        $('status').textContent = 'Requesting permissions…';
+
+        // iOS 13+ orientation permission
+        try {
+            if (typeof DeviceOrientationEvent !== 'undefined' &&
+                typeof DeviceOrientationEvent.requestPermission === 'function') {
+                const resp = await DeviceOrientationEvent.requestPermission();
+                if (resp !== 'granted') $('status').textContent = 'Compass denied';
             }
-            updateUI();
-        }
+        } catch (e) { /* ignore */ }
 
-        // Register Service Worker for Offline
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js');
+        window.addEventListener('deviceorientationabsolute', handleOrientation, true);
+        window.addEventListener('deviceorientation', handleOrientation, true);
+
+        if (!navigator.geolocation) {
+            $('status').textContent = 'No geolocation on this device';
+            return;
         }
-    </script>
+        navigator.geolocation.watchPosition(onPosition, onPositionError, {
+            enableHighAccuracy: true,
+            maximumAge: 2000,
+            timeout: 20000
+        });
+
+        // Stale-fix watchdog
+        setInterval(() => {
+            if (lastFix && Date.now() - lastFix > 15000) {
+                $('arrow').classList.add('stale');
+            }
+        }, 3000);
+    }
+
+    // Buttons
+    $('startBtn').addEventListener('click', startCompass);
+
+    $('nightBtn').addEventListener('click', () => {
+        document.body.classList.toggle('night');
+        const night = document.body.classList.contains('night');
+        localStorage.setItem('night', night ? '1' : '0');
+        $('nightBtn').textContent = night ? 'Day' : 'Night';
+    });
+    if (localStorage.getItem('night') === '1') {
+        document.body.classList.add('night');
+        $('nightBtn').textContent = 'Day';
+    }
+
+    $('setCampBtn').addEventListener('click', () => {
+        if (userLat == null) {
+            $('status').textContent = 'Need a GPS fix first — tap Start';
+            return;
+        }
+        target = { lat: userLat, lon: userLon };
+        localStorage.setItem('camp', JSON.stringify(target));
+        trailPoints = [];
+        $('status').textContent = `Camp set: ${target.lat.toFixed(5)}, ${target.lon.toFixed(5)}`;
+        updateUI();
+    });
+
+    $('sosBtn').addEventListener('click', () => {
+        $('sosLat').textContent = userLat != null ? userLat.toFixed(6) : 'No GPS';
+        $('sosLon').textContent = userLon != null ? userLon.toFixed(6) : 'No GPS';
+        $('sosAcc').textContent = userAcc != null ? `Accuracy ±${Math.round(userAcc)}m` : '';
+        $('sos').classList.add('show');
+    });
+    $('sosClose').addEventListener('click', () => $('sos').classList.remove('show'));
+
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js');
+    }
+})();
+</script>
 </body>
 </html>
