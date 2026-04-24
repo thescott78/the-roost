@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Burner Compass</title>
+    <link rel="manifest" href="manifest.json">
+    <style>
+        body { margin: 0; background: #1a1a1a; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
+        #arrow { width: 200px; height: 200px; transition: transform 0.2s ease-out; }
+        #distance { font-size: 2rem; font-weight: bold; margin-top: 20px; }
+        #status { font-size: 0.8rem; color: #888; margin-top: 10px; text-align: center; padding: 0 20px; }
+        .btn { background: #ff4500; color: white; border: none; padding: 15px 30px; border-radius: 30px; font-size: 1rem; cursor: pointer; margin-top: 20px; }
+    </style>
+</head>
+<body>
+
+    <svg id="arrow" viewBox="0 0 100 100">
+        <polygon points="50,5 95,95 50,75 5,95" fill="#ff4500" />
+    </svg>
+
+    <div id="distance">Finding Camp...</div>
+    <div id="status">Waiting for GPS...</div>
+    <button class="btn" onclick="startCompass()">Start Compass</button>
+
+    <script>
+        const TARGET_LAT = -32.517363;
+        const TARGET_LON = 19.949305;
+        
+        let userLat, userLon, deviceHeading = 0;
+
+        function toRad(deg) { return deg * Math.PI / 180; }
+        function toDeg(rad) { return rad * 180 / Math.PI; }
+
+        // Distance Calculation (Haversine)
+        function getDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371000; // Earth radius in meters
+            const dLat = toRad(lat2 - lat1);
+            const dLon = toRad(lon2 - lon1);
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * 
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+
+        // Bearing Calculation
+        function getBearing(lat1, lon1, lat2, lon2) {
+            const y = Math.sin(toRad(lon2 - lon1)) * Math.cos(toRad(lat2));
+            const x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
+                      Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(toRad(lon2 - lon1));
+            return (toDeg(Math.atan2(y, x)) + 360) % 360;
+        }
+
+        function updateUI() {
+            if (!userLat || !userLon) return;
+
+            const dist = getDistance(userLat, userLon, TARGET_LAT, TARGET_LON);
+            const bearing = getBearing(userLat, userLon, TARGET_LAT, TARGET_LON);
+            
+            // The arrow rotation needs to be: Target Bearing - Device Heading
+            const arrowRotation = bearing - deviceHeading;
+            document.getElementById('arrow').style.transform = `rotate(${arrowRotation}deg)`;
+            
+            document.getElementById('distance').innerText = dist > 1000 ? 
+                (dist/1000).toFixed(2) + " km" : Math.round(dist) + " m";
+            document.getElementById('status').innerText = `Your GPS: ${userLat.toFixed(5)}, ${userLon.toFixed(5)}`;
+        }
+
+        function startCompass() {
+            // Request permission for iOS 13+
+            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                DeviceOrientationEvent.requestPermission()
+                    .then(response => { if (response == 'granted') window.addEventListener('deviceorientation', handleOrientation, true); })
+                    .catch(console.error);
+            } else {
+                window.addEventListener('deviceorientationabsolute', handleOrientation, true);
+                window.addEventListener('deviceorientation', handleOrientation, true);
+            }
+
+            navigator.geolocation.watchPosition(pos => {
+                userLat = pos.coords.latitude;
+                userLon = pos.coords.longitude;
+                updateUI();
+            }, err => {
+                document.getElementById('status').innerText = "GPS Error: " + err.message;
+            }, { enableHighAccuracy: true });
+        }
+
+        function handleOrientation(event) {
+            // Handle iOS vs Android heading
+            if (event.webkitCompassHeading) {
+                deviceHeading = event.webkitCompassHeading;
+            } else if (event.absolute === true || event.alpha !== null) {
+                deviceHeading = 360 - event.alpha; // Android
+            }
+            updateUI();
+        }
+
+        // Register Service Worker for Offline
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js');
+        }
+    </script>
+</body>
+</html>
