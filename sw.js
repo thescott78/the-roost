@@ -1,4 +1,4 @@
-const CACHE_NAME = 'burner-v19';
+const CACHE_NAME = 'burner-v20';
 const ASSETS = [
     './',
     './index.html',
