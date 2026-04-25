@@ -533,12 +533,71 @@
     let lastHapticInterval = 0;
     let arrived = false;
 
-    // Quotes — placeholder until user supplies the array
+    // Quotes — split on " — " into { text, author }
     const QUOTES = [
-        { text: "Not all those who wander are lost.", author: "J.R.R. Tolkien" },
-        { text: "Wherever you go, there you are.", author: "Jon Kabat-Zinn" },
-        { text: "The desert tells a different story every time one ventures on it.", author: "Robert Edison Fulton Jr." }
-    ];
+        "Wherever you are, be there totally. — Eckhart Tolle",
+        "Wherever you go, there you are. — Jon Kabat-Zinn",
+        "Life is now. — Eckhart Tolle",
+        "Walk as if you are kissing the Earth with your feet. — Thich Nhat Hanh",
+        "Feelings come and go like clouds in a windy sky. — Thich Nhat Hanh",
+        "Smile, breathe, and go slowly. — Thich Nhat Hanh",
+        "When walking, walk. When eating, eat. — Zen proverb",
+        "The obstacle is the path. — Zen saying",
+        "Nature does not hurry, yet everything is accomplished. — Lao Tzu",
+        "A journey of a thousand miles begins beneath your feet. — Lao Tzu",
+        "He who knows he has enough is rich. — Lao Tzu",
+        "Be where you are; otherwise you will miss your life. — Buddha (attributed)",
+        "Peace comes from within. — Buddha (attributed)",
+        "No snowflake ever falls in the wrong place. — Zen saying",
+        "The only way out is through. — Robert Frost",
+        "Not all those who wander are lost. — J.R.R. Tolkien",
+        "Still round the corner there may wait. — J.R.R. Tolkien",
+        "We travel, some of us forever, to seek other states. — Anaïs Nin",
+        "The real voyage is discovery. — Marcel Proust",
+        "All truly great thoughts are conceived while walking. — Friedrich Nietzsche",
+        "Remain a child while finding your way. — Søren Kierkegaard (adapted)",
+        "The present moment is filled with joy and happiness. — Thich Nhat Hanh",
+        "Let yourself be silently drawn by what you love. — Rumi",
+        "Where there is ruin, there is hope for a treasure. — Rumi",
+        "Stop acting so small. You are the universe in motion. — Rumi",
+        "Step out of the circle of time and into the circle of love. — Rumi",
+        "In the middle of difficulty lies opportunity. — Albert Einstein",
+        "Look deep into nature, and then you will understand everything better. — Albert Einstein",
+        "Adopt the pace of nature. — Ralph Waldo Emerson",
+        "Laat waai kwagga! — Leon Schuster",
+        "This is it. — Alan Watts",
+        "The journey is the destination. — Alan Watts",
+        "You don’t need to arrive—just walk. — Alan Watts",
+        "Reality is only now. — Alan Watts",
+        "You are exactly where you should be. — Alan Watts",
+        "The path appears as you walk it. — Alan Watts",
+        "Nothing to chase, nowhere to rush. — Alan Watts",
+        "You are part of the way. — Alan Watts",
+        "Where you stand is the centre of the world. — Alan Watts",
+        "No wrong turns, only new directions. — Alan Watts",
+        "Let go and keep moving. — Alan Watts",
+        "The present is the only place to be. — Alan Watts",
+        "You’re already on the way home. — Alan Watts",
+        "Walking is arriving. — Alan Watts",
+        "There is no separate self to get lost. — Alan Watts",
+        "You are the universe exploring itself. — Alan Watts",
+        "The map is not the territory. — Alan Watts",
+        "Every step completes itself. — Alan Watts",
+        "You don’t need to find the way—you are it. — Alan Watts",
+        "Now is the place to arrive. — Alan Watts",
+        "You cannot fall out of reality. — Alan Watts",
+        "The way out is through. — Alan Watts",
+        "Nothing is missing. — Alan Watts",
+        "You are carried as much as you walk. — Alan Watts",
+        "The moment is complete. — Alan Watts",
+        "Lose yourself, find the path. — Alan Watts",
+        "You are already home. — Alan Watts"
+    ].map(s => {
+        const i = s.indexOf(' — ');
+        return i < 0
+            ? { text: s.trim(), author: '' }
+            : { text: s.slice(0, i).trim(), author: s.slice(i + 3).trim() };
+    });
     let quoteIndex = -1;
     let quoteTimer = null;
     let lastQuoteShown = 0;
@@ -564,7 +623,7 @@
             if (q.author) {
                 const a = document.createElement('span');
                 a.className = 'author';
-                a.textContent = '— ' + q.author;
+                a.textContent = q.author;
                 el.appendChild(a);
             }
             el.classList.add('show');
