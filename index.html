@@ -234,6 +234,19 @@
             width: 100%; padding: 18px; font-size: 1.1rem; margin: 14px 0 4px;
         }
 
+        /* idle vs tracking state */
+        #startBtn.huge {
+            margin: 28px auto 0; padding: 22px 44px;
+            font-size: 1.4rem; font-weight: 800;
+            box-shadow: 0 0 40px rgba(255,69,0,0.35);
+            display: block;
+        }
+        body.tracking #startBtn.huge { display: none; }
+        body:not(.tracking) #trackingDisplay,
+        body:not(.tracking) #trail,
+        body:not(.tracking) #stopBtn { display: none; }
+        body.tracking #trackingDisplay { display: block; text-align: center; width: 100%; }
+
         /* confetti */
         .confetti {
             position: fixed; top: -10px; width: 10px; height: 14px;
@@ -260,12 +273,16 @@
     </svg>
 </div>
 
-<div id="distance">Finding Camp…</div>
-<div id="meta"><span id="accuracy"></span><span id="eta"></span></div>
-<div id="status">Tap Start to begin</div>
-<div id="arrivedActions">
-    <button class="btn stop glow" id="stopFromArrival" type="button">⚡ Stop GPS · Save battery</button>
-    <div class="hint">You're home — tracking off saves your phone</div>
+<button class="btn huge" id="startBtn" type="button">Start Compass</button>
+
+<div id="trackingDisplay">
+    <div id="distance">Finding Camp…</div>
+    <div id="meta"><span id="accuracy"></span><span id="eta"></span></div>
+    <div id="status"></div>
+    <div id="arrivedActions">
+        <button class="btn stop glow" id="stopFromArrival" type="button">⚡ Stop GPS · Save battery</button>
+        <div class="hint">You're home — tracking off saves your phone</div>
+    </div>
 </div>
 
 <svg id="trail" viewBox="-50 -50 100 100" preserveAspectRatio="xMidYMid meet">
@@ -273,8 +290,8 @@
 </svg>
 
 <div id="controls">
-    <button class="btn" id="startBtn">Start Compass</button>
-    <button class="btn secondary" id="destBtn">Destinations</button>
+    <button class="btn stop" id="stopBtn" type="button">Stop</button>
+    <button class="btn secondary" id="destBtn" type="button">Destinations</button>
 </div>
 
 <div id="calib">📱 Wave phone in a figure-8 to calibrate compass</div>
@@ -609,6 +626,7 @@
     let staleWatchdog = null;
     let orientationListenersAdded = false;
     let pendingCapture = null; // {name, timeoutId} when waiting for first fix to save a dest
+    let gpsStartedForModal = false; // GPS was auto-started for the destinations modal preview
 
     function addOrientationListeners() {
         if (orientationListenersAdded) return;
@@ -696,22 +714,13 @@
     }
 
     function updateTrackingUI() {
-        const btn = $('startBtn');
-        if (gpsStarted) {
-            btn.textContent = 'Stop';
-            btn.classList.add('stop');
-        } else {
-            btn.textContent = 'Start Compass';
-            btn.classList.remove('stop');
-        }
+        document.body.classList.toggle('tracking', gpsStarted);
         $('arrivedActions').classList.toggle('show', arrived && gpsStarted);
     }
 
     // Buttons
-    $('startBtn').addEventListener('click', () => {
-        if (gpsStarted) stopGps();
-        else startCompass();
-    });
+    $('startBtn').addEventListener('click', startCompass);
+    $('stopBtn').addEventListener('click', stopGps);
     $('stopFromArrival').addEventListener('click', stopGps);
 
     $('nightBtn').addEventListener('click', () => {
@@ -798,6 +807,8 @@
     }
 
     function selectLocation(id) {
+        // Picking a destination is a commitment to navigate, so keep GPS on
+        gpsStartedForModal = false;
         if (id === activeId) {
             $('destModal').classList.remove('show');
             return;
@@ -876,6 +887,8 @@
         const loc = { id: newId(), name, lat, lon };
         locations.push(loc);
         activeId = loc.id;
+        // Saving a destination commits to tracking — don't auto-stop on close
+        gpsStartedForModal = false;
         saveState();
         $('newName').value = '';
         $('newLat').value = '';
@@ -940,6 +953,13 @@
     $('destBtn').addEventListener('click', () => {
         setAddError('');
         clearPendingDelete();
+        // Auto-start GPS so the per-row arrows + distances are live.
+        // Track that we started it for the modal so we can shut it back off
+        // if the user leaves without picking or saving anything.
+        if (!gpsStarted) {
+            gpsStartedForModal = true;
+            startCompass();
+        }
         renderDestList();
         $('destModal').classList.add('show');
     });
@@ -952,6 +972,10 @@
             $('captureGpsBtn').disabled = false;
         }
         $('destModal').classList.remove('show');
+        if (gpsStartedForModal) {
+            gpsStartedForModal = false;
+            stopGps();
+        }
     });
     $('captureGpsBtn').addEventListener('click', captureGps);
     $('saveDestBtn').addEventListener('click', saveManualDest);
