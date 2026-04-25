@@ -112,6 +112,18 @@
         }
         body.night .btn { background: var(--fg); color: #000; }
         .btn.secondary { background: transparent; color: var(--fg); border: 1px solid var(--muted); font-weight: 500; }
+        .btn.stop { background: var(--ring-6); color: #fff; }
+        body.night .btn.stop { background: var(--ring-6); color: #000; }
+        .btn.glow { animation: stop-pulse 1.4s ease-in-out infinite; }
+        @keyframes stop-pulse {
+            0%,100% { box-shadow: 0 0 0 0 rgba(255,23,68,0.55); }
+            50%     { box-shadow: 0 0 0 14px rgba(255,23,68,0); }
+        }
+
+        #arrivedActions { display: none; margin-top: 14px; text-align: center; }
+        #arrivedActions.show { display: block; }
+        #arrivedActions .btn { padding: 16px 28px; font-size: 1.05rem; }
+        #arrivedActions .hint { font-size: 0.8rem; color: var(--muted); margin-top: 6px; }
 
         #calib {
             position: fixed; left: 0; right: 0; bottom: 80px; margin: 0 auto;
@@ -245,6 +257,10 @@
 <div id="distance">Finding Camp…</div>
 <div id="meta"><span id="accuracy"></span><span id="eta"></span></div>
 <div id="status">Tap Start to begin</div>
+<div id="arrivedActions">
+    <button class="btn stop glow" id="stopFromArrival" type="button">⚡ Stop GPS · Save battery</button>
+    <div class="hint">You're home — tracking off saves your phone</div>
+</div>
 
 <svg id="trail" viewBox="-50 -50 100 100" preserveAspectRatio="xMidYMid meet">
     <circle cx="0" cy="0" r="2" fill="var(--accent)" />
@@ -441,6 +457,7 @@
         document.body.classList.add('arrived');
         $('distance').classList.add('arrived');
         $('distance').textContent = "You're home!";
+        updateTrackingUI();
         if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 400]);
         for (let i = 0; i < 50; i++) {
             const c = document.createElement('div');
@@ -459,6 +476,7 @@
         arrived = false;
         document.body.classList.remove('arrived');
         $('distance').classList.remove('arrived');
+        updateTrackingUI();
     }
 
     function updateUI() {
@@ -581,7 +599,23 @@
     }
 
     let gpsStarted = false;
-    let pendingCapture = null; // {timeoutId} when waiting for first fix to save a dest
+    let watchId = null;
+    let staleWatchdog = null;
+    let orientationListenersAdded = false;
+    let pendingCapture = null; // {name, timeoutId} when waiting for first fix to save a dest
+
+    function addOrientationListeners() {
+        if (orientationListenersAdded) return;
+        window.addEventListener('deviceorientationabsolute', handleOrientation, true);
+        window.addEventListener('deviceorientation', handleOrientation, true);
+        orientationListenersAdded = true;
+    }
+    function removeOrientationListeners() {
+        if (!orientationListenersAdded) return;
+        window.removeEventListener('deviceorientationabsolute', handleOrientation, true);
+        window.removeEventListener('deviceorientation', handleOrientation, true);
+        orientationListenersAdded = false;
+    }
 
     function startGps() {
         if (gpsStarted) return true;
@@ -589,22 +623,57 @@
             $('status').textContent = 'No geolocation on this device';
             return false;
         }
-        navigator.geolocation.watchPosition(onPosition, onPositionError, {
+        watchId = navigator.geolocation.watchPosition(onPosition, onPositionError, {
             enableHighAccuracy: true,
             maximumAge: 2000,
             timeout: 20000
         });
         gpsStarted = true;
-        setInterval(() => {
+        staleWatchdog = setInterval(() => {
             if (lastFix && Date.now() - lastFix > 15000) {
                 $('arrow').classList.add('stale');
             }
         }, 3000);
+        $('meta').innerHTML = '<span id="accuracy"></span><span id="eta"></span>';
+        $('arrow').classList.remove('stale');
+        updateTrackingUI();
         return true;
     }
 
+    function stopGps() {
+        if (!gpsStarted) return;
+        if (watchId != null) {
+            try { navigator.geolocation.clearWatch(watchId); } catch {}
+        }
+        watchId = null;
+        if (staleWatchdog) { clearInterval(staleWatchdog); staleWatchdog = null; }
+        setHaptic(0);
+        removeOrientationListeners();
+        if (pendingCapture) {
+            clearTimeout(pendingCapture.timeoutId);
+            pendingCapture = null;
+            $('captureGpsBtn').textContent = '📍 Save with current GPS';
+            $('captureGpsBtn').disabled = false;
+        }
+        gpsStarted = false;
+        deviceHeading = null;
+        compassAccuracy = null;
+        userLat = null; userLon = null; userAcc = null;
+        speedSamples = [];
+        ['r1','r2','r3'].forEach(id => $(id).classList.remove('active'));
+        $('arrow').classList.add('stale');
+        document.body.classList.remove('arrived');
+        $('distance').classList.remove('arrived');
+        if (arrived) {
+            $('distance').textContent = "You're home";
+        }
+        $('meta').innerHTML = '<span>🔋 GPS off — saving battery</span>';
+        $('status').textContent = 'Tap Start to resume tracking';
+        updateTrackingUI();
+    }
+
     async function startCompass() {
-        $('startBtn').style.display = 'none';
+        if (gpsStarted) return;
         $('status').textContent = 'Requesting permissions…';
 
         // iOS 13+ orientation permission
@@ -616,14 +685,28 @@
             }
         } catch (e) { /* ignore */ }
 
-        window.addEventListener('deviceorientationabsolute', handleOrientation, true);
-        window.addEventListener('deviceorientation', handleOrientation, true);
-
+        addOrientationListeners();
         startGps();
     }
 
+    function updateTrackingUI() {
+        const btn = $('startBtn');
+        if (gpsStarted) {
+            btn.textContent = 'Stop';
+            btn.classList.add('stop');
+        } else {
+            btn.textContent = 'Start Compass';
+            btn.classList.remove('stop');
+        }
+        $('arrivedActions').classList.toggle('show', arrived && gpsStarted);
+    }
+
     // Buttons
-    $('startBtn').addEventListener('click', startCompass);
+    $('startBtn').addEventListener('click', () => {
+        if (gpsStarted) stopGps();
+        else startCompass();
+    });
+    $('stopFromArrival').addEventListener('click', stopGps);
 
     $('nightBtn').addEventListener('click', () => {
         document.body.classList.toggle('night');
