@@ -122,11 +122,19 @@
             filter: drop-shadow(0 0 3px rgba(0,0,0,0.6));
         }
         #trail .you {
-            fill: #fff;
-            stroke: #000;
-            stroke-width: 1.5;
-            transition: cx 0.2s linear, cy 0.2s linear;
-            filter: drop-shadow(0 0 6px rgba(255,255,255,0.6));
+            transition: transform 0.2s linear;
+            filter: drop-shadow(0 0 5px rgba(0,0,0,0.7));
+        }
+        #trail .you-heart {
+            transform-origin: center;
+            transform-box: fill-box;
+        }
+        #trail .you.moving .you-heart {
+            animation: heart-pulse 1.1s ease-in-out infinite;
+        }
+        @keyframes heart-pulse {
+            0%, 100% { transform: scale(1); }
+            50%      { transform: scale(1.22); }
         }
 
         /* layering — rings/arrow underneath, trail above them, UI on top */
@@ -529,6 +537,34 @@
     let speedSamples = []; // {t, lat, lon}
     let trailPoints = [];  // last N {lat, lon}
     const TRAIL_MAX = 60;
+
+    const RAINBOW_STOPS = [
+        [0.00, [0xff, 0x3b, 0x30]],
+        [0.17, [0xff, 0x95, 0x00]],
+        [0.33, [0xff, 0xcc, 0x00]],
+        [0.50, [0x34, 0xc7, 0x59]],
+        [0.67, [0x00, 0xc7, 0xbe]],
+        [0.83, [0x5e, 0x5c, 0xe6]],
+        [1.00, [0xbf, 0x5a, 0xf2]],
+    ];
+    const HEART_PATH = 'M178,40c-20.65,0-38.73,8.88-50,23.89C116.73,48.88,98.65,40,78,40a62.07,62.07,0,0,0-62,62c0,70,103.79,126.66,108.21,129a8,8,0,0,0,7.58,0C136.21,228.66,240,172,240,102A62.07,62.07,0,0,0,178,40Z';
+
+    function rainbowColor(t) {
+        if (!isFinite(t)) t = 0.5;
+        t = Math.max(0, Math.min(1, t));
+        for (let i = 0; i < RAINBOW_STOPS.length - 1; i++) {
+            const [t1, c1] = RAINBOW_STOPS[i];
+            const [t2, c2] = RAINBOW_STOPS[i + 1];
+            if (t <= t2) {
+                const f = (t - t1) / Math.max(1e-9, t2 - t1);
+                const r = Math.round(c1[0] + (c2[0] - c1[0]) * f);
+                const g = Math.round(c1[1] + (c2[1] - c1[1]) * f);
+                const b = Math.round(c1[2] + (c2[2] - c1[2]) * f);
+                return `rgb(${r},${g},${b})`;
+            }
+        }
+        return '#fff';
+    }
     let hapticTimer = null;
     let lastHapticInterval = 0;
     let arrived = false;
@@ -752,12 +788,36 @@
         svg.appendChild(poly);
 
         const last = projected[projected.length - 1];
-        const you = document.createElementNS(ns, 'circle');
-        you.setAttribute('cx', (cx + last.x*scale).toFixed(1));
-        you.setAttribute('cy', (cy + last.y*scale).toFixed(1));
-        you.setAttribute('r', '7');
-        you.setAttribute('class', 'tp you');
-        svg.appendChild(you);
+        const userPx = (cx + last.x * scale);
+        const userPy = (cy + last.y * scale);
+
+        // Heart color matches the rainbow line color at the user's
+        // horizontal position within the trail bbox (the gradient runs
+        // left-to-right across that bbox by default).
+        const bboxW = (maxX - minX) || 1;
+        const t = (last.x - minX) / bboxW;
+        const heartFill = rainbowColor(t);
+
+        const moving = estimateSpeed() > 0.3;
+        // Outer <g> places + sizes the heart at the user's projected position.
+        // Inner <g> centers the path so it scales around its visual center.
+        const heartSize = 20; // pixels — visually similar to the previous dot
+        const s = heartSize / 256;
+        const youG = document.createElementNS(ns, 'g');
+        youG.setAttribute('class', 'tp you' + (moving ? ' moving' : ''));
+        youG.setAttribute('transform', `translate(${userPx.toFixed(1)},${userPy.toFixed(1)}) scale(${s.toFixed(4)})`);
+
+        const center = document.createElementNS(ns, 'g');
+        center.setAttribute('transform', 'translate(-128,-128)');
+
+        const heart = document.createElementNS(ns, 'path');
+        heart.setAttribute('class', 'you-heart');
+        heart.setAttribute('d', HEART_PATH);
+        heart.setAttribute('fill', heartFill);
+
+        center.appendChild(heart);
+        youG.appendChild(center);
+        svg.appendChild(youG);
     }
 
     window.addEventListener('resize', () => updateTrail());
