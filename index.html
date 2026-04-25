@@ -135,11 +135,12 @@
             position: relative; z-index: 3;
         }
 
-        /* Quote (no box) */
+        /* Quote (no box) — pushed to the bottom of available space, just above controls */
         #quote {
-            margin: 14px auto 6px;
+            margin: auto 0 14px;
             padding: 0 18px;
             max-width: 560px;
+            width: 100%;
             text-align: center;
             color: var(--fg);
             font-style: italic;
@@ -151,6 +152,7 @@
             min-height: 3em;
             max-height: 18vh;
             overflow: hidden;
+            flex-shrink: 0;
         }
         #quote.show { opacity: 0.92; }
         #quote .author {
@@ -164,7 +166,7 @@
         #controls {
             display: flex; gap: 10px; flex-wrap: wrap;
             justify-content: center;
-            margin-top: auto; margin-bottom: 6px;
+            margin-bottom: 6px;
             flex-shrink: 0;
         }
         .btn {
@@ -590,28 +592,33 @@
         const wrapRect = $('compass-wrap').getBoundingClientRect();
         const cx = wrapRect.left + wrapRect.width / 2;
         const cy = wrapRect.top + wrapRect.height / 2;
-        // Pick the smaller distance from arrow-center to nearest viewport edge
-        // so the user-dot can reach an edge in any direction without overshooting.
-        const edge = Math.max(
-            40,
-            Math.min(cx, cy, w - cx, h - cy) - 20
-        );
 
         const tgt = activeLocation();
         const latRad = toRad(tgt.lat);
         const mPerDegLat = 111320;
         const mPerDegLon = 111320 * Math.cos(latRad);
 
-        let maxR = 1;
+        // Project each trail point to local meters, tracking the bounding box
+        // so we can scale uniformly to fit the whole wander on-screen with margin.
+        let minX = 0, maxX = 0, minY = 0, maxY = 0;
         const projected = trailPoints.map(p => {
             const x = (p.lon - tgt.lon) * mPerDegLon;
             const y = -(p.lat - tgt.lat) * mPerDegLat; // north up
-            const r = Math.hypot(x, y);
-            if (r > maxR) maxR = r;
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
             return { x, y };
         });
 
-        const scale = edge / maxR;
+        // Margin from any edge of the screen — leaves room for an indirect wander
+        const margin = 36;
+        const candidates = [];
+        if (maxX > 0) candidates.push((w - cx - margin) / maxX);
+        if (minX < 0) candidates.push((margin - cx) / minX);    // both negative -> positive
+        if (maxY > 0) candidates.push((h - cy - margin) / maxY);
+        if (minY < 0) candidates.push((margin - cy) / minY);
+        const scale = candidates.length ? Math.min(...candidates) : 1;
         const ns = 'http://www.w3.org/2000/svg';
         const pts = projected.map(p =>
             `${(cx + p.x*scale).toFixed(1)},${(cy + p.y*scale).toFixed(1)}`
