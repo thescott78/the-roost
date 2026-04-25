@@ -139,51 +139,82 @@
             position: fixed; inset: 0; background: rgba(0,0,0,0.96);
             display: none; flex-direction: column;
             padding: env(safe-area-inset-top) 16px env(safe-area-inset-bottom) 16px;
-            z-index: 10; overflow-y: auto;
+            z-index: 10;
         }
         #destModal.show { display: flex; }
         #destModal h2 {
-            font-size: 1.1rem; margin: 14px 0 10px; color: var(--fg);
-            display: flex; justify-content: space-between; align-items: center;
+            font-size: 1.4rem; margin: 18px 4px 14px; color: var(--fg);
+            font-weight: 700;
         }
-        #destModal h2 .x {
-            background: transparent; border: none; color: var(--muted);
-            font-size: 1.6rem; cursor: pointer; padding: 4px 12px;
-        }
+        #destScroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
         #destList { list-style: none; padding: 0; margin: 0 0 18px; }
         #destList li {
-            display: flex; align-items: center; gap: 12px;
-            padding: 12px; border: 1px solid var(--muted); border-radius: 10px;
-            margin-bottom: 8px; cursor: pointer;
+            display: flex; align-items: stretch; gap: 0;
+            border: 1.5px solid var(--muted); border-radius: 14px;
+            margin-bottom: 12px; overflow: hidden;
         }
-        #destList li.active { border-color: var(--accent); background: rgba(255,69,0,0.08); }
+        #destList li.active { border-color: var(--accent); background: rgba(255,69,0,0.1); }
         body.night #destList li.active { background: rgba(255,42,42,0.1); }
-        #destList li .miniarrow {
-            width: 32px; height: 32px; flex-shrink: 0;
+        #destList .row-select {
+            flex: 1; display: flex; align-items: center; gap: 14px;
+            padding: 18px 14px; background: transparent; border: none;
+            color: var(--fg); cursor: pointer; min-height: 64px;
+            font-family: inherit; text-align: left;
+            -webkit-tap-highlight-color: rgba(255,69,0,0.2);
+        }
+        #destList .miniarrow {
+            width: 38px; height: 38px; flex-shrink: 0;
             transition: transform 0.2s ease-out;
         }
-        #destList li .miniarrow polygon { fill: var(--accent); }
+        #destList .miniarrow polygon { fill: var(--accent); }
         #destList li.active .miniarrow polygon { fill: var(--ring-6); }
-        #destList li .info { flex-grow: 1; min-width: 0; }
-        #destList li .name { font-weight: 700; font-size: 1.05rem; }
-        #destList li .sub { font-size: 0.8rem; color: var(--muted); }
-        #destList li .del {
-            background: transparent; border: none; color: var(--muted);
-            font-size: 1.4rem; cursor: pointer; padding: 4px 10px;
+        #destList .info { flex-grow: 1; min-width: 0; }
+        #destList .name { font-weight: 700; font-size: 1.15rem; line-height: 1.2; }
+        #destList .sub { font-size: 0.85rem; color: var(--muted); margin-top: 3px; }
+        #destList .check {
+            font-size: 1.4rem; color: var(--ring-6); margin-left: 8px;
+            display: none;
         }
-        #addForm { border-top: 1px solid var(--muted); padding-top: 14px; }
-        #addForm h3 { margin: 0 0 10px; font-size: 1rem; color: var(--muted); font-weight: 500; }
+        #destList li.active .check { display: inline; }
+        #destList .del {
+            background: transparent; border: none; border-left: 1px solid var(--muted);
+            color: var(--muted); cursor: pointer;
+            min-width: 56px; font-size: 1.5rem;
+            display: flex; align-items: center; justify-content: center;
+            font-family: inherit;
+            -webkit-tap-highlight-color: rgba(255,23,68,0.3);
+        }
+        #destList .del.confirm {
+            background: var(--ring-6); color: #fff; font-size: 0.85rem;
+            font-weight: 700; padding: 0 10px;
+        }
+
+        #addForm { border-top: 1px solid var(--muted); padding-top: 18px; margin-top: 4px; }
+        #addForm h3 { margin: 0 0 12px; font-size: 1.05rem; color: var(--fg); font-weight: 600; }
         #addForm input {
-            width: 100%; padding: 12px; background: transparent;
-            color: var(--fg); border: 1px solid var(--muted); border-radius: 8px;
-            font-size: 1rem; margin-bottom: 8px; font-family: inherit;
+            width: 100%; padding: 16px; background: transparent;
+            color: var(--fg); border: 1.5px solid var(--muted); border-radius: 10px;
+            font-size: 1rem; margin-bottom: 10px; font-family: inherit;
         }
         #addForm input:focus { outline: none; border-color: var(--accent); }
-        #addForm .row { display: flex; gap: 8px; }
-        #addForm .row input { flex: 1; }
-        #addForm .actions { display: flex; gap: 8px; margin-top: 6px; }
-        #addForm .actions .btn { flex: 1; padding: 12px; }
-        #addError { color: var(--ring-5); font-size: 0.85rem; min-height: 1.2em; margin-bottom: 4px; }
+        #addForm .latlon { display: flex; gap: 8px; }
+        #addForm .latlon input { flex: 1; }
+        #addForm .btn { width: 100%; padding: 16px; font-size: 1.05rem; margin-top: 4px; }
+        #addError { color: var(--ring-5); font-size: 0.9rem; min-height: 1.2em; margin: 4px 0 8px; }
+
+        #manualToggle {
+            background: transparent; border: none; color: var(--muted);
+            font-size: 0.95rem; padding: 12px 0; cursor: pointer;
+            text-align: center; width: 100%;
+            font-family: inherit; text-decoration: underline;
+            -webkit-tap-highlight-color: transparent;
+        }
+        #manualFields { display: none; }
+        #manualFields.show { display: block; }
+
+        #closeDest {
+            width: 100%; padding: 18px; font-size: 1.1rem; margin: 14px 0 4px;
+        }
 
         /* confetti */
         .confetti {
@@ -237,21 +268,25 @@
 </div>
 
 <div id="destModal">
-    <h2>Destinations <button class="x" id="destClose" aria-label="Close">×</button></h2>
-    <ul id="destList"></ul>
-    <div id="addForm">
-        <h3>Add new</h3>
-        <input id="newName" type="text" placeholder="Name (e.g. Stone Circle)" maxlength="40">
-        <div class="row">
-            <input id="newLat" type="text" inputmode="decimal" placeholder="Latitude">
-            <input id="newLon" type="text" inputmode="decimal" placeholder="Longitude">
-        </div>
-        <div id="addError"></div>
-        <div class="actions">
-            <button class="btn secondary" id="captureGpsBtn">Use current GPS</button>
-            <button class="btn" id="saveDestBtn">Save</button>
+    <h2>Destinations</h2>
+    <div id="destScroll">
+        <ul id="destList"></ul>
+        <div id="addForm">
+            <h3>Add new</h3>
+            <input id="newName" type="text" placeholder="Name (e.g. Stone Circle)" maxlength="40">
+            <div id="addError"></div>
+            <button class="btn" id="captureGpsBtn">📍 Save with current GPS</button>
+            <button id="manualToggle" type="button">Or enter coordinates manually ▾</button>
+            <div id="manualFields">
+                <div class="latlon">
+                    <input id="newLat" type="text" inputmode="decimal" placeholder="Latitude">
+                    <input id="newLon" type="text" inputmode="decimal" placeholder="Longitude">
+                </div>
+                <button class="btn secondary" id="saveDestBtn">Save coordinates</button>
+            </div>
         </div>
     </div>
+    <button class="btn" id="closeDest">Close</button>
 </div>
 
 <script>
@@ -514,6 +549,13 @@
             if (trailPoints.length > TRAIL_MAX) trailPoints.shift();
         }
 
+        if (pendingCapture) {
+            const p = pendingCapture;
+            pendingCapture = null;
+            clearTimeout(p.timeoutId);
+            saveCurrentGpsAsDest(p.name);
+        }
+
         updateUI();
     }
 
@@ -538,6 +580,29 @@
         updateUI();
     }
 
+    let gpsStarted = false;
+    let pendingCapture = null; // {timeoutId} when waiting for first fix to save a dest
+
+    function startGps() {
+        if (gpsStarted) return true;
+        if (!navigator.geolocation) {
+            $('status').textContent = 'No geolocation on this device';
+            return false;
+        }
+        navigator.geolocation.watchPosition(onPosition, onPositionError, {
+            enableHighAccuracy: true,
+            maximumAge: 2000,
+            timeout: 20000
+        });
+        gpsStarted = true;
+        setInterval(() => {
+            if (lastFix && Date.now() - lastFix > 15000) {
+                $('arrow').classList.add('stale');
+            }
+        }, 3000);
+        return true;
+    }
+
     async function startCompass() {
         $('startBtn').style.display = 'none';
         $('status').textContent = 'Requesting permissions…';
@@ -554,22 +619,7 @@
         window.addEventListener('deviceorientationabsolute', handleOrientation, true);
         window.addEventListener('deviceorientation', handleOrientation, true);
 
-        if (!navigator.geolocation) {
-            $('status').textContent = 'No geolocation on this device';
-            return;
-        }
-        navigator.geolocation.watchPosition(onPosition, onPositionError, {
-            enableHighAccuracy: true,
-            maximumAge: 2000,
-            timeout: 20000
-        });
-
-        // Stale-fix watchdog
-        setInterval(() => {
-            if (lastFix && Date.now() - lastFix > 15000) {
-                $('arrow').classList.add('stale');
-            }
-        }, 3000);
+        startGps();
     }
 
     // Buttons
@@ -587,6 +637,9 @@
     }
 
     // ---- Destinations modal ----
+    let pendingDeleteId = null;
+    let pendingDeleteTimeout = null;
+
     function renderDestList() {
         const ul = $('destList');
         ul.innerHTML = '';
@@ -598,6 +651,10 @@
             const li = document.createElement('li');
             li.dataset.id = loc.id;
             if (loc.id === activeId) li.classList.add('active');
+
+            const select = document.createElement('button');
+            select.className = 'row-select';
+            select.type = 'button';
 
             const svg = document.createElementNS(ns, 'svg');
             svg.setAttribute('viewBox', '0 0 100 100');
@@ -626,37 +683,70 @@
             info.appendChild(name);
             info.appendChild(sub);
 
+            const check = document.createElement('span');
+            check.className = 'check';
+            check.textContent = '✓';
+
+            select.appendChild(svg);
+            select.appendChild(info);
+            select.appendChild(check);
+            select.addEventListener('click', () => selectLocation(loc.id));
+
             const del = document.createElement('button');
-            del.className = 'del';
-            del.textContent = '×';
+            del.type = 'button';
+            del.className = 'del' + (pendingDeleteId === loc.id ? ' confirm' : '');
+            del.textContent = pendingDeleteId === loc.id ? 'Sure?' : '×';
             del.setAttribute('aria-label', 'Delete');
             del.addEventListener('click', (e) => {
                 e.stopPropagation();
-                deleteLocation(loc.id);
+                handleDeleteTap(loc.id);
             });
 
-            li.addEventListener('click', () => selectLocation(loc.id));
-            li.appendChild(svg);
-            li.appendChild(info);
+            li.appendChild(select);
             li.appendChild(del);
             ul.appendChild(li);
         }
     }
 
     function selectLocation(id) {
-        if (id === activeId) return;
+        if (id === activeId) {
+            $('destModal').classList.remove('show');
+            return;
+        }
         activeId = id;
         saveState();
         unCelebrate();
+        clearPendingDelete();
         renderDestList();
         updateUI();
+        $('destModal').classList.remove('show');
     }
 
-    function deleteLocation(id) {
+    function handleDeleteTap(id) {
         if (locations.length <= 1) {
             setAddError("Can't delete the last destination");
             return;
         }
+        if (pendingDeleteId === id) {
+            clearPendingDelete();
+            deleteLocation(id);
+        } else {
+            clearPendingDelete();
+            pendingDeleteId = id;
+            pendingDeleteTimeout = setTimeout(() => {
+                pendingDeleteId = null;
+                renderDestList();
+            }, 3000);
+            renderDestList();
+        }
+    }
+
+    function clearPendingDelete() {
+        if (pendingDeleteTimeout) { clearTimeout(pendingDeleteTimeout); pendingDeleteTimeout = null; }
+        pendingDeleteId = null;
+    }
+
+    function deleteLocation(id) {
         const i = locations.findIndex(l => l.id === id);
         if (i < 0) return;
         locations.splice(i, 1);
@@ -684,18 +774,16 @@
         return n;
     }
 
-    function saveDest() {
-        setAddError('');
+    function validateName() {
         const name = $('newName').value.trim();
-        if (!name) { setAddError('Name is required'); return; }
+        if (!name) { setAddError('Name is required'); return null; }
         if (locations.some(l => l.name.toLowerCase() === name.toLowerCase())) {
-            setAddError('That name is already used'); return;
+            setAddError('That name is already used'); return null;
         }
-        const lat = parseCoord($('newLat').value, -90, 90);
-        const lon = parseCoord($('newLon').value, -180, 180);
-        if (isNaN(lat) || isNaN(lon)) {
-            setAddError('Enter valid lat/lon or tap "Use current GPS"'); return;
-        }
+        return name;
+    }
+
+    function commitNewLocation(name, lat, lon) {
         const loc = { id: newId(), name, lat, lon };
         locations.push(loc);
         activeId = loc.id;
@@ -703,30 +791,89 @@
         $('newName').value = '';
         $('newLat').value = '';
         $('newLon').value = '';
+        $('manualFields').classList.remove('show');
+        $('manualToggle').textContent = 'Or enter coordinates manually ▾';
+        setAddError('');
         unCelebrate();
         renderDestList();
         updateUI();
+        $('captureGpsBtn').textContent = '📍 Save with current GPS';
+        $('captureGpsBtn').disabled = false;
+    }
+
+    function saveCurrentGpsAsDest(name) {
+        commitNewLocation(name, userLat, userLon);
+    }
+
+    function saveManualDest() {
+        setAddError('');
+        const name = validateName();
+        if (!name) return;
+        const lat = parseCoord($('newLat').value, -90, 90);
+        const lon = parseCoord($('newLon').value, -180, 180);
+        if (isNaN(lat) || isNaN(lon)) {
+            setAddError('Enter valid lat/lon (or use current GPS above)');
+            return;
+        }
+        commitNewLocation(name, lat, lon);
     }
 
     function captureGps() {
         setAddError('');
-        if (userLat == null) {
-            setAddError('No GPS fix yet — tap Start first');
+        const name = validateName();
+        if (!name) return;
+
+        if (userLat != null) {
+            saveCurrentGpsAsDest(name);
             return;
         }
-        $('newLat').value = userLat.toFixed(6);
-        $('newLon').value = userLon.toFixed(6);
-        if (!$('newName').value.trim()) $('newName').focus();
+
+        if (!startGps()) {
+            setAddError('Geolocation unavailable on this device');
+            return;
+        }
+
+        // Wait for first fix, with timeout
+        $('captureGpsBtn').textContent = 'Getting GPS fix…';
+        $('captureGpsBtn').disabled = true;
+        if (pendingCapture) clearTimeout(pendingCapture.timeoutId);
+        pendingCapture = {
+            name,
+            timeoutId: setTimeout(() => {
+                pendingCapture = null;
+                $('captureGpsBtn').textContent = '📍 Save with current GPS';
+                $('captureGpsBtn').disabled = false;
+                setAddError('GPS timed out — check location permission');
+            }, 30000)
+        };
     }
 
     $('destBtn').addEventListener('click', () => {
         setAddError('');
+        clearPendingDelete();
         renderDestList();
         $('destModal').classList.add('show');
     });
-    $('destClose').addEventListener('click', () => $('destModal').classList.remove('show'));
+    $('closeDest').addEventListener('click', () => {
+        clearPendingDelete();
+        if (pendingCapture) {
+            clearTimeout(pendingCapture.timeoutId);
+            pendingCapture = null;
+            $('captureGpsBtn').textContent = '📍 Save with current GPS';
+            $('captureGpsBtn').disabled = false;
+        }
+        $('destModal').classList.remove('show');
+    });
     $('captureGpsBtn').addEventListener('click', captureGps);
-    $('saveDestBtn').addEventListener('click', saveDest);
+    $('saveDestBtn').addEventListener('click', saveManualDest);
+    $('manualToggle').addEventListener('click', () => {
+        const panel = $('manualFields');
+        const showing = panel.classList.toggle('show');
+        $('manualToggle').textContent = showing
+            ? 'Hide manual entry ▴'
+            : 'Or enter coordinates manually ▾';
+        if (showing) $('newLat').focus();
+    });
 
     $('sosBtn').addEventListener('click', () => {
         $('sosLat').textContent = userLat != null ? userLat.toFixed(6) : 'No GPS';
