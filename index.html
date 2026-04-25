@@ -1030,6 +1030,8 @@
         compassAccuracy = null;
         userLat = null; userLon = null; userAcc = null;
         speedSamples = [];
+        trailPoints = [];
+        [...$('trail').querySelectorAll('.tp')].forEach(n => n.remove());
         ['r1','r2','r3'].forEach(id => $(id).classList.remove('active'));
         $('arrow').classList.add('stale');
         document.body.classList.remove('arrived');
