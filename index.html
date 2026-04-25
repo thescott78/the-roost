@@ -207,7 +207,14 @@
             font-weight: 700; padding: 0 10px;
         }
 
-        #addForm { border-top: 1px solid var(--muted); padding-top: 18px; margin-top: 4px; }
+        #addForm {
+            border: 1.5px solid var(--muted);
+            border-radius: 14px;
+            padding: 18px 16px 16px;
+            margin-top: 18px;
+            background: rgba(255,255,255,0.025);
+        }
+        body.night #addForm { background: rgba(255,42,42,0.05); }
         #addForm h3 { margin: 0 0 12px; font-size: 1.05rem; color: var(--fg); font-weight: 600; }
         #addForm input {
             width: 100%; padding: 16px; background: transparent;
@@ -325,7 +332,7 @@
             </div>
         </div>
     </div>
-    <button class="btn" id="closeDest">Close</button>
+    <button class="btn secondary" id="closeDest" type="button">Close</button>
 </div>
 
 <script>
