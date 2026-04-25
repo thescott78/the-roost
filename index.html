@@ -437,6 +437,7 @@
     <div class="label">Longitude</div>
     <div class="coord" id="sosLon">—</div>
     <div id="sosDetails"></div>
+    <button class="btn" id="sosFetchBtn" type="button" style="display:none;margin-top:24px">Get my location 📍</button>
     <button class="btn secondary close" id="sosClose">Close</button>
 </div>
 
@@ -1200,17 +1201,38 @@
         if (showing) $('newLat').focus();
     });
 
+    let sosFix = null; // one-shot lat/lon/acc captured while GPS is off
+
     function renderSos() {
-        $('sosLat').textContent = userLat != null ? userLat.toFixed(6) : '— GPS off';
-        $('sosLon').textContent = userLon != null ? userLon.toFixed(6) : '— GPS off';
+        const lat = userLat != null ? userLat : (sosFix && sosFix.lat);
+        const lon = userLon != null ? userLon : (sosFix && sosFix.lon);
+        const acc = userAcc != null ? userAcc : (sosFix && sosFix.acc);
+
+        $('sosLat').textContent = lat != null ? lat.toFixed(6) : (gpsStarted ? 'Getting fix…' : '—');
+        $('sosLon').textContent = lon != null ? lon.toFixed(6) : (gpsStarted ? 'Getting fix…' : '—');
+
+        const fetchBtn = $('sosFetchBtn');
+        if (gpsStarted) {
+            fetchBtn.style.display = 'none';
+        } else {
+            fetchBtn.style.display = 'inline-block';
+            if (sosFetching) {
+                fetchBtn.textContent = 'Getting fix…';
+                fetchBtn.disabled = true;
+            } else {
+                fetchBtn.textContent = sosFix ? 'Refresh location' : 'Get my location 📍';
+                fetchBtn.disabled = false;
+            }
+        }
+
         const tgt = activeLocation();
         const lines = [];
-        if (userAcc != null) lines.push(`Accuracy <span class="v">±${Math.round(userAcc)}m</span>`);
+        if (acc != null) lines.push(`Accuracy <span class="v">±${Math.round(acc)}m</span>`);
         if (deviceHeading != null) {
             lines.push(`Heading <span class="v">${Math.round(deviceHeading)}°</span>`);
         }
-        if (userLat != null) {
-            const d = haversine(userLat, userLon, tgt.lat, tgt.lon);
+        if (lat != null) {
+            const d = haversine(lat, lon, tgt.lat, tgt.lon);
             const dStr = d >= 1000 ? (d/1000).toFixed(2) + ' km' : Math.round(d) + ' m';
             lines.push(`Distance to <span class="v">${tgt.name}</span> · <span class="v">${dStr}</span>`);
         } else {
@@ -1218,6 +1240,35 @@
         }
         $('sosDetails').innerHTML = lines.join('<br>');
     }
+
+    let sosFetching = false;
+    function fetchSosLocation() {
+        if (sosFetching) return;
+        if (!navigator.geolocation) {
+            showToast('No geolocation on this device', 5000);
+            return;
+        }
+        sosFetching = true;
+        renderSos();
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                sosFix = {
+                    lat: pos.coords.latitude,
+                    lon: pos.coords.longitude,
+                    acc: pos.coords.accuracy
+                };
+                sosFetching = false;
+                renderSos();
+            },
+            (err) => {
+                sosFetching = false;
+                showToast('GPS error: ' + err.message, 5000);
+                renderSos();
+            },
+            { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+        );
+    }
+    $('sosFetchBtn').addEventListener('click', fetchSosLocation);
     let sosUpdateTimer = null;
     $('sosBtn').addEventListener('click', () => {
         renderSos();
