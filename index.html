@@ -222,6 +222,20 @@
         #sos #sosDetails { margin-top: 22px; font-size: 0.95rem; color: var(--muted); text-align: center; line-height: 1.7; }
         #sos #sosDetails .v { color: var(--fg); font-weight: 600; }
         #sos .close { margin-top: 36px; min-width: 140px; }
+        #updateLink {
+            display: block;
+            margin-top: 28px;
+            text-align: center;
+            color: var(--muted);
+            font-size: 0.78rem;
+            text-decoration: underline;
+            cursor: pointer;
+            background: none;
+            border: none;
+            font-family: inherit;
+            padding: 8px 12px;
+            -webkit-tap-highlight-color: transparent;
+        }
 
         /* Destinations modal */
         #destModal {
@@ -439,6 +453,7 @@
     <div id="sosDetails"></div>
     <button class="btn" id="sosFetchBtn" type="button" style="display:none;margin-top:24px">Get my location 📍</button>
     <button class="btn secondary close" id="sosClose">Close</button>
+    <button id="updateLink" type="button">Check for updates</button>
 </div>
 
 <div id="destModal">
@@ -1269,6 +1284,28 @@
         );
     }
     $('sosFetchBtn').addEventListener('click', fetchSosLocation);
+
+    $('updateLink').addEventListener('click', async () => {
+        const ok = confirm(
+            "Refresh the app to fetch the latest version?\n\n" +
+            "⚠️ You must have cellphone signal — without it the app may fail to load."
+        );
+        if (!ok) return;
+        try {
+            if ('serviceWorker' in navigator) {
+                const regs = await navigator.serviceWorker.getRegistrations();
+                await Promise.all(regs.map(r => r.unregister()));
+            }
+            if (window.caches) {
+                const keys = await caches.keys();
+                await Promise.all(keys.map(k => caches.delete(k)));
+            }
+        } catch (err) {
+            // best-effort cleanup; reload anyway
+        }
+        const url = window.location.pathname + '?v=' + Date.now();
+        window.location.replace(url);
+    });
     let sosUpdateTimer = null;
     $('sosBtn').addEventListener('click', () => {
         renderSos();
