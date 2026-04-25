@@ -134,6 +134,57 @@
         #sos .label { font-size: 0.8rem; color: var(--muted); margin-top: 16px; }
         #sos .close { margin-top: 36px; }
 
+        /* Destinations modal */
+        #destModal {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.96);
+            display: none; flex-direction: column;
+            padding: env(safe-area-inset-top) 16px env(safe-area-inset-bottom) 16px;
+            z-index: 10; overflow-y: auto;
+        }
+        #destModal.show { display: flex; }
+        #destModal h2 {
+            font-size: 1.1rem; margin: 14px 0 10px; color: var(--fg);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        #destModal h2 .x {
+            background: transparent; border: none; color: var(--muted);
+            font-size: 1.6rem; cursor: pointer; padding: 4px 12px;
+        }
+        #destList { list-style: none; padding: 0; margin: 0 0 18px; }
+        #destList li {
+            display: flex; align-items: center; gap: 12px;
+            padding: 12px; border: 1px solid var(--muted); border-radius: 10px;
+            margin-bottom: 8px; cursor: pointer;
+        }
+        #destList li.active { border-color: var(--accent); background: rgba(255,69,0,0.08); }
+        body.night #destList li.active { background: rgba(255,42,42,0.1); }
+        #destList li .miniarrow {
+            width: 32px; height: 32px; flex-shrink: 0;
+            transition: transform 0.2s ease-out;
+        }
+        #destList li .miniarrow polygon { fill: var(--accent); }
+        #destList li.active .miniarrow polygon { fill: var(--ring-6); }
+        #destList li .info { flex-grow: 1; min-width: 0; }
+        #destList li .name { font-weight: 700; font-size: 1.05rem; }
+        #destList li .sub { font-size: 0.8rem; color: var(--muted); }
+        #destList li .del {
+            background: transparent; border: none; color: var(--muted);
+            font-size: 1.4rem; cursor: pointer; padding: 4px 10px;
+        }
+        #addForm { border-top: 1px solid var(--muted); padding-top: 14px; }
+        #addForm h3 { margin: 0 0 10px; font-size: 1rem; color: var(--muted); font-weight: 500; }
+        #addForm input {
+            width: 100%; padding: 12px; background: transparent;
+            color: var(--fg); border: 1px solid var(--muted); border-radius: 8px;
+            font-size: 1rem; margin-bottom: 8px; font-family: inherit;
+        }
+        #addForm input:focus { outline: none; border-color: var(--accent); }
+        #addForm .row { display: flex; gap: 8px; }
+        #addForm .row input { flex: 1; }
+        #addForm .actions { display: flex; gap: 8px; margin-top: 6px; }
+        #addForm .actions .btn { flex: 1; padding: 12px; }
+        #addError { color: var(--ring-5); font-size: 0.85rem; min-height: 1.2em; margin-bottom: 4px; }
+
         /* confetti */
         .confetti {
             position: fixed; top: -10px; width: 10px; height: 14px;
@@ -170,7 +221,7 @@
 
 <div id="controls">
     <button class="btn" id="startBtn">Start Compass</button>
-    <button class="btn secondary" id="setCampBtn">Set camp here</button>
+    <button class="btn secondary" id="destBtn">Destinations</button>
 </div>
 
 <div id="calib">📱 Wave phone in a figure-8 to calibrate compass</div>
@@ -185,11 +236,61 @@
     <button class="btn close" id="sosClose">Close</button>
 </div>
 
+<div id="destModal">
+    <h2>Destinations <button class="x" id="destClose" aria-label="Close">×</button></h2>
+    <ul id="destList"></ul>
+    <div id="addForm">
+        <h3>Add new</h3>
+        <input id="newName" type="text" placeholder="Name (e.g. Stone Circle)" maxlength="40">
+        <div class="row">
+            <input id="newLat" type="text" inputmode="decimal" placeholder="Latitude">
+            <input id="newLon" type="text" inputmode="decimal" placeholder="Longitude">
+        </div>
+        <div id="addError"></div>
+        <div class="actions">
+            <button class="btn secondary" id="captureGpsBtn">Use current GPS</button>
+            <button class="btn" id="saveDestBtn">Save</button>
+        </div>
+    </div>
+</div>
+
 <script>
 (() => {
-    const DEFAULT_TARGET = { lat: -32.517363, lon: 19.949305 };
-    const saved = JSON.parse(localStorage.getItem('camp') || 'null');
-    let target = saved || DEFAULT_TARGET;
+    const DEFAULT_LOCATIONS = [
+        { id: 'base', name: 'Base Camp', lat: -32.517363, lon: 19.949305 }
+    ];
+
+    let locations, activeId;
+    function loadState() {
+        try {
+            const raw = JSON.parse(localStorage.getItem('roost-data') || 'null');
+            if (raw && Array.isArray(raw.locations) && raw.locations.length) {
+                locations = raw.locations;
+                activeId = raw.activeId && locations.find(l => l.id === raw.activeId)
+                    ? raw.activeId : locations[0].id;
+                return;
+            }
+        } catch {}
+        locations = DEFAULT_LOCATIONS.slice();
+        // migrate legacy single-camp storage
+        const legacy = JSON.parse(localStorage.getItem('camp') || 'null');
+        if (legacy && typeof legacy.lat === 'number' && typeof legacy.lon === 'number') {
+            const sameAsBase = Math.abs(legacy.lat - DEFAULT_LOCATIONS[0].lat) < 1e-5 &&
+                               Math.abs(legacy.lon - DEFAULT_LOCATIONS[0].lon) < 1e-5;
+            if (!sameAsBase) {
+                locations.push({ id: 'legacy', name: 'My Camp', lat: legacy.lat, lon: legacy.lon });
+            }
+        }
+        activeId = locations[0].id;
+        saveState();
+    }
+    function saveState() {
+        localStorage.setItem('roost-data', JSON.stringify({ locations, activeId }));
+    }
+    function activeLocation() {
+        return locations.find(l => l.id === activeId) || locations[0];
+    }
+    loadState();
 
     let userLat = null, userLon = null, userAcc = null;
     let deviceHeading = null;
@@ -262,15 +363,16 @@
         [...svg.querySelectorAll('.tp')].forEach(n => n.remove());
         if (!trailPoints.length) return;
 
-        // Project relative to camp, using a simple equirectangular scale
-        const latRad = toRad(target.lat);
+        // Project relative to active destination, using a simple equirectangular scale
+        const tgt = activeLocation();
+        const latRad = toRad(tgt.lat);
         const mPerDegLat = 111320;
         const mPerDegLon = 111320 * Math.cos(latRad);
 
         let maxR = 1;
         const projected = trailPoints.map(p => {
-            const x = (p.lon - target.lon) * mPerDegLon;
-            const y = -(p.lat - target.lat) * mPerDegLat; // invert y so north is up
+            const x = (p.lon - tgt.lon) * mPerDegLon;
+            const y = -(p.lat - tgt.lat) * mPerDegLat; // invert y so north is up
             const r = Math.hypot(x, y);
             if (r > maxR) maxR = r;
             return { x, y };
@@ -327,8 +429,9 @@
     function updateUI() {
         if (userLat == null) return;
 
-        const dist = haversine(userLat, userLon, target.lat, target.lon);
-        const brg = bearing(userLat, userLon, target.lat, target.lon);
+        const tgt = activeLocation();
+        const dist = haversine(userLat, userLon, tgt.lat, tgt.lon);
+        const brg = bearing(userLat, userLon, tgt.lat, tgt.lon);
         const zone = zoneFor(dist);
 
         document.documentElement.style.setProperty('--ring-current', zone.color);
@@ -388,6 +491,10 @@
         $('calib').classList.toggle('show', badCompass);
 
         updateTrail();
+
+        if ($('destModal').classList.contains('show')) {
+            renderDestList();
+        }
     }
 
     function onPosition(pos) {
@@ -479,17 +586,147 @@
         $('nightBtn').textContent = 'Day';
     }
 
-    $('setCampBtn').addEventListener('click', () => {
-        if (userLat == null) {
-            $('status').textContent = 'Need a GPS fix first — tap Start';
+    // ---- Destinations modal ----
+    function renderDestList() {
+        const ul = $('destList');
+        ul.innerHTML = '';
+        const ns = 'http://www.w3.org/2000/svg';
+        const heading = deviceHeading ?? 0;
+        const screenAngle = (screen.orientation && screen.orientation.angle) || 0;
+
+        for (const loc of locations) {
+            const li = document.createElement('li');
+            li.dataset.id = loc.id;
+            if (loc.id === activeId) li.classList.add('active');
+
+            const svg = document.createElementNS(ns, 'svg');
+            svg.setAttribute('viewBox', '0 0 100 100');
+            svg.setAttribute('class', 'miniarrow');
+            const poly = document.createElementNS(ns, 'polygon');
+            poly.setAttribute('points', '50,5 95,95 50,75 5,95');
+            svg.appendChild(poly);
+
+            const info = document.createElement('div');
+            info.className = 'info';
+            const name = document.createElement('div');
+            name.className = 'name';
+            name.textContent = loc.name;
+            const sub = document.createElement('div');
+            sub.className = 'sub';
+
+            if (userLat != null) {
+                const d = haversine(userLat, userLon, loc.lat, loc.lon);
+                const b = bearing(userLat, userLon, loc.lat, loc.lon);
+                svg.style.transform = `rotate(${b - heading + screenAngle}deg)`;
+                sub.textContent = (d >= 1000 ? (d/1000).toFixed(2) + ' km' : Math.round(d) + ' m');
+            } else {
+                svg.style.opacity = '0.3';
+                sub.textContent = `${loc.lat.toFixed(5)}, ${loc.lon.toFixed(5)}`;
+            }
+            info.appendChild(name);
+            info.appendChild(sub);
+
+            const del = document.createElement('button');
+            del.className = 'del';
+            del.textContent = '×';
+            del.setAttribute('aria-label', 'Delete');
+            del.addEventListener('click', (e) => {
+                e.stopPropagation();
+                deleteLocation(loc.id);
+            });
+
+            li.addEventListener('click', () => selectLocation(loc.id));
+            li.appendChild(svg);
+            li.appendChild(info);
+            li.appendChild(del);
+            ul.appendChild(li);
+        }
+    }
+
+    function selectLocation(id) {
+        if (id === activeId) return;
+        activeId = id;
+        saveState();
+        unCelebrate();
+        renderDestList();
+        updateUI();
+    }
+
+    function deleteLocation(id) {
+        if (locations.length <= 1) {
+            setAddError("Can't delete the last destination");
             return;
         }
-        target = { lat: userLat, lon: userLon };
-        localStorage.setItem('camp', JSON.stringify(target));
-        trailPoints = [];
-        $('status').textContent = `Camp set: ${target.lat.toFixed(5)}, ${target.lon.toFixed(5)}`;
+        const i = locations.findIndex(l => l.id === id);
+        if (i < 0) return;
+        locations.splice(i, 1);
+        if (activeId === id) {
+            activeId = locations[0].id;
+            unCelebrate();
+        }
+        saveState();
+        renderDestList();
         updateUI();
+    }
+
+    function setAddError(msg) {
+        $('addError').textContent = msg || '';
+    }
+
+    function newId() {
+        return 'loc-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
+    }
+
+    function parseCoord(s, min, max) {
+        if (!s) return NaN;
+        const n = parseFloat(s.trim());
+        if (!isFinite(n) || n < min || n > max) return NaN;
+        return n;
+    }
+
+    function saveDest() {
+        setAddError('');
+        const name = $('newName').value.trim();
+        if (!name) { setAddError('Name is required'); return; }
+        if (locations.some(l => l.name.toLowerCase() === name.toLowerCase())) {
+            setAddError('That name is already used'); return;
+        }
+        const lat = parseCoord($('newLat').value, -90, 90);
+        const lon = parseCoord($('newLon').value, -180, 180);
+        if (isNaN(lat) || isNaN(lon)) {
+            setAddError('Enter valid lat/lon or tap "Use current GPS"'); return;
+        }
+        const loc = { id: newId(), name, lat, lon };
+        locations.push(loc);
+        activeId = loc.id;
+        saveState();
+        $('newName').value = '';
+        $('newLat').value = '';
+        $('newLon').value = '';
+        unCelebrate();
+        renderDestList();
+        updateUI();
+    }
+
+    function captureGps() {
+        setAddError('');
+        if (userLat == null) {
+            setAddError('No GPS fix yet — tap Start first');
+            return;
+        }
+        $('newLat').value = userLat.toFixed(6);
+        $('newLon').value = userLon.toFixed(6);
+        if (!$('newName').value.trim()) $('newName').focus();
+    }
+
+    $('destBtn').addEventListener('click', () => {
+        setAddError('');
+        renderDestList();
+        $('destModal').classList.add('show');
     });
+    $('destClose').addEventListener('click', () => $('destModal').classList.remove('show'));
+    $('captureGpsBtn').addEventListener('click', captureGps);
+    $('saveDestBtn').addEventListener('click', saveDest);
 
     $('sosBtn').addEventListener('click', () => {
         $('sosLat').textContent = userLat != null ? userLat.toFixed(6) : 'No GPS';
