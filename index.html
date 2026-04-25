@@ -86,19 +86,30 @@
         #arrow.stale { opacity: 0.35; }
         #arrow polygon { fill: var(--ring-current, var(--accent)); transition: fill 0.4s; }
 
+        #destIcon {
+            position: absolute; width: 18%; height: 18%;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 2;
+        }
+        #destIcon polygon {
+            fill: var(--accent);
+            stroke: #fff;
+            stroke-width: 2;
+            stroke-linejoin: round;
+            filter: drop-shadow(0 0 6px rgba(0,0,0,0.6));
+        }
+        body.night #destIcon polygon { fill: var(--fg); stroke: #1a0000; }
+
         #distance {
             font-size: 3rem; font-weight: 800; margin-top: 18px;
             letter-spacing: -1px;
         }
         #distance.arrived { color: var(--ring-6) !important; }
-        #meta {
-            font-size: 0.9rem; color: var(--muted);
-            margin-top: 4px; text-align: center;
-        }
-        #meta .warn { color: var(--ring-5); }
-        #status {
-            font-size: 0.75rem; color: var(--muted); margin-top: 6px;
-            text-align: center; min-height: 1em;
+        #eta {
+            font-size: 1rem; color: var(--muted);
+            margin-top: 6px; text-align: center; min-height: 1.2em;
         }
 
         #trail {
@@ -171,6 +182,17 @@
             display: none;
         }
         #calib.show { display: block; }
+        #statusToast {
+            position: fixed; left: 0; right: 0; bottom: 130px; margin: 0 auto;
+            width: max-content; max-width: 90%;
+            background: rgba(0,0,0,0.8); color: var(--fg);
+            border: 1px solid var(--muted);
+            padding: 10px 16px; border-radius: 20px;
+            font-size: 0.85rem; pointer-events: none;
+            opacity: 0; transition: opacity 0.25s;
+            z-index: 4;
+        }
+        #statusToast.show { opacity: 1; }
 
         /* SOS modal */
         #sos {
@@ -182,7 +204,9 @@
         #sos h2 { font-size: 1.2rem; margin: 0 0 20px; color: var(--muted); font-weight: 500; }
         #sos .coord { font-size: 2.4rem; font-weight: 800; letter-spacing: 1px; margin: 6px 0; text-align: center; }
         #sos .label { font-size: 0.8rem; color: var(--muted); margin-top: 16px; }
-        #sos .close { margin-top: 36px; }
+        #sos #sosDetails { margin-top: 22px; font-size: 0.95rem; color: var(--muted); text-align: center; line-height: 1.7; }
+        #sos #sosDetails .v { color: var(--fg); font-weight: 600; }
+        #sos .close { margin-top: 36px; min-width: 140px; }
 
         /* Destinations modal */
         #destModal {
@@ -312,14 +336,16 @@
     <svg id="arrow" viewBox="0 0 100 100">
         <polygon points="50,5 95,95 50,75 5,95" />
     </svg>
+    <svg id="destIcon" viewBox="0 0 100 100" aria-hidden="true">
+        <polygon points="50,8 61.8,38.6 94.5,40.5 68.6,60.4 79.6,92.0 50,73.5 20.4,92.0 31.4,60.4 5.5,40.5 38.2,38.6" />
+    </svg>
 </div>
 
 <button class="btn huge" id="startBtn" type="button">Start Compass</button>
 
 <div id="trackingDisplay">
     <div id="distance">Finding Camp…</div>
-    <div id="meta"><span id="accuracy"></span><span id="eta"></span></div>
-    <div id="status"></div>
+    <div id="eta"></div>
     <div id="arrivedActions">
         <button class="btn stop glow" id="stopFromArrival" type="button">⚡ Stop GPS · Save battery</button>
         <div class="hint">You're home — tracking off saves your phone</div>
@@ -334,6 +360,7 @@
 </div>
 
 <div id="calib">📱 Wave phone in a figure-8 to calibrate compass</div>
+<div id="statusToast"></div>
 
 <div id="sos">
     <h2>Read these to camp radio</h2>
@@ -341,8 +368,8 @@
     <div class="coord" id="sosLat">—</div>
     <div class="label">Longitude</div>
     <div class="coord" id="sosLon">—</div>
-    <div class="label" id="sosAcc"></div>
-    <button class="btn close" id="sosClose">Close</button>
+    <div id="sosDetails"></div>
+    <button class="btn secondary close" id="sosClose">Close</button>
 </div>
 
 <div id="destModal">
@@ -459,6 +486,15 @@
         showRandomQuote();
         if (quoteTimer) clearInterval(quoteTimer);
         quoteTimer = setInterval(showRandomQuote, 30000);
+    }
+
+    let statusToastTimer = null;
+    function showToast(msg, dur = 3500) {
+        const el = $('statusToast');
+        el.textContent = msg || '';
+        el.classList.toggle('show', !!msg);
+        if (statusToastTimer) { clearTimeout(statusToastTimer); statusToastTimer = null; }
+        if (msg && dur) statusToastTimer = setTimeout(() => el.classList.remove('show'), dur);
     }
 
     const toRad = (d) => d * Math.PI / 180;
@@ -636,27 +672,26 @@
             $('distance').textContent = formatDist(dist);
         }
 
-        // Accuracy + ETA
-        let accText = '';
-        if (userAcc != null) {
-            const warn = userAcc > 30 ? ' warn' : '';
-            accText = `<span class="${warn.trim()}">±${Math.round(userAcc)}m</span>`;
-        }
+        // ETA
         const speed = estimateSpeed();
         let etaText = '';
-        if (speed > 0.3 && dist > 15) {
+        if (dist <= 15) {
+            etaText = '';
+        } else if (speed > 0.3) {
             const eta = dist / speed;
-            if (eta < 3600) {
-                const mins = Math.max(1, Math.round(eta / 60));
-                etaText = ` · ~${mins} min`;
+            if (eta < 60) {
+                etaText = '~under a minute to go';
+            } else if (eta < 3600) {
+                const mins = Math.round(eta / 60);
+                etaText = `~${mins} min${mins === 1 ? '' : 's'} to go`;
+            } else {
+                const hrs = Math.round(eta / 360) / 10;
+                etaText = `~${hrs} hr${hrs === 1 ? '' : 's'} to go`;
             }
+        } else {
+            etaText = ''; // standing still — leave blank
         }
-        $('accuracy').innerHTML = accText;
-        $('eta').innerHTML = etaText;
-
-        // Status
-        const heads = deviceHeading == null ? 'no compass' : `heading ${Math.round(heading)}°`;
-        $('status').textContent = `GPS ${userLat.toFixed(5)}, ${userLon.toFixed(5)} · ${heads}`;
+        $('eta').textContent = etaText;
 
         // Haptics
         setHaptic(zone.hap);
@@ -700,7 +735,7 @@
     }
 
     function onPositionError(err) {
-        $('status').textContent = 'GPS error: ' + err.message;
+        showToast('GPS error: ' + err.message, 5000);
     }
 
     function handleOrientation(event) {
@@ -743,7 +778,7 @@
     function startGps() {
         if (gpsStarted) return true;
         if (!navigator.geolocation) {
-            $('status').textContent = 'No geolocation on this device';
+            showToast('No geolocation on this device', 5000);
             return false;
         }
         watchId = navigator.geolocation.watchPosition(onPosition, onPositionError, {
@@ -757,7 +792,6 @@
                 $('arrow').classList.add('stale');
             }
         }, 3000);
-        $('meta').innerHTML = '<span id="accuracy"></span><span id="eta"></span>';
         $('arrow').classList.remove('stale');
         updateTrackingUI();
         return true;
@@ -790,21 +824,20 @@
         if (arrived) {
             $('distance').textContent = "You're home";
         }
-        $('meta').innerHTML = '<span>🔋 GPS off — saving battery</span>';
-        $('status').textContent = 'Tap Start to resume tracking';
+        $('eta').textContent = '';
         updateTrackingUI();
     }
 
     async function startCompass() {
         if (gpsStarted) return;
-        $('status').textContent = 'Requesting permissions…';
+        showToast('Requesting permissions…', 2500);
 
         // iOS 13+ orientation permission
         try {
             if (typeof DeviceOrientationEvent !== 'undefined' &&
                 typeof DeviceOrientationEvent.requestPermission === 'function') {
                 const resp = await DeviceOrientationEvent.requestPermission();
-                if (resp !== 'granted') $('status').textContent = 'Compass denied';
+                if (resp !== 'granted') showToast('Compass permission denied', 4000);
             }
         } catch (e) { /* ignore */ }
 
@@ -1095,13 +1128,36 @@
         if (showing) $('newLat').focus();
     });
 
+    function renderSos() {
+        $('sosLat').textContent = userLat != null ? userLat.toFixed(6) : '— GPS off';
+        $('sosLon').textContent = userLon != null ? userLon.toFixed(6) : '— GPS off';
+        const tgt = activeLocation();
+        const lines = [];
+        if (userAcc != null) lines.push(`Accuracy <span class="v">±${Math.round(userAcc)}m</span>`);
+        if (deviceHeading != null) {
+            lines.push(`Heading <span class="v">${Math.round(deviceHeading)}°</span>`);
+        }
+        if (userLat != null) {
+            const d = haversine(userLat, userLon, tgt.lat, tgt.lon);
+            const dStr = d >= 1000 ? (d/1000).toFixed(2) + ' km' : Math.round(d) + ' m';
+            lines.push(`Distance to <span class="v">${tgt.name}</span> · <span class="v">${dStr}</span>`);
+        } else {
+            lines.push(`Target: <span class="v">${tgt.name}</span>`);
+        }
+        $('sosDetails').innerHTML = lines.join('<br>');
+    }
+    let sosUpdateTimer = null;
     $('sosBtn').addEventListener('click', () => {
-        $('sosLat').textContent = userLat != null ? userLat.toFixed(6) : 'No GPS';
-        $('sosLon').textContent = userLon != null ? userLon.toFixed(6) : 'No GPS';
-        $('sosAcc').textContent = userAcc != null ? `Accuracy ±${Math.round(userAcc)}m` : '';
+        renderSos();
         $('sos').classList.add('show');
+        // Refresh while open so heading/accuracy stay current
+        if (sosUpdateTimer) clearInterval(sosUpdateTimer);
+        sosUpdateTimer = setInterval(renderSos, 1000);
     });
-    $('sosClose').addEventListener('click', () => $('sos').classList.remove('show'));
+    $('sosClose').addEventListener('click', () => {
+        $('sos').classList.remove('show');
+        if (sosUpdateTimer) { clearInterval(sosUpdateTimer); sosUpdateTimer = null; }
+    });
 
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('sw.js');
