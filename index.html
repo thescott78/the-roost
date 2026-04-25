@@ -313,12 +313,52 @@
         }
 
         /* idle vs tracking state */
+        @property --rainbow-angle {
+            syntax: '<angle>';
+            initial-value: 0deg;
+            inherits: false;
+        }
+
         #startBtn.huge {
-            margin: 18px auto 0; padding: 20px 40px;
-            font-size: 1.3rem; font-weight: 800;
-            box-shadow: 0 0 40px rgba(255,69,0,0.35);
+            margin: 18px auto 0;
+            padding: 20px 40px;
+            font-size: 1.3rem;
+            font-weight: 800;
             display: block;
             flex-shrink: 0;
+            color: #fff;
+            border: 4px solid transparent;
+            border-radius: 32px;
+            background:
+                linear-gradient(var(--accent), var(--accent)) padding-box,
+                conic-gradient(from var(--rainbow-angle),
+                    #ff3b30, #ff9500, #ffcc00, #34c759,
+                    #00c7be, #5e5ce6, #bf5af2, #ff3b30
+                ) border-box;
+            box-shadow:
+                0 0 28px rgba(255, 69, 0, 0.35),
+                0 0 60px rgba(94, 92, 230, 0.18);
+            animation:
+                rainbow-spin 3.5s linear infinite,
+                journey-pulse 2.4s ease-in-out infinite;
+        }
+        body.night #startBtn.huge {
+            color: #000;
+            background:
+                linear-gradient(var(--fg), var(--fg)) padding-box,
+                conic-gradient(from var(--rainbow-angle),
+                    #ff3b30, #ff9500, #ffcc00, #34c759,
+                    #00c7be, #5e5ce6, #bf5af2, #ff3b30
+                ) border-box;
+        }
+        #startBtn.huge:active { transform: scale(0.97); }
+
+        @keyframes rainbow-spin {
+            to { --rainbow-angle: 360deg; }
+        }
+        @keyframes journey-pulse {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 28px rgba(255,69,0,0.35), 0 0 60px rgba(94,92,230,0.18); }
+            50%      { transform: scale(1.035); box-shadow: 0 0 38px rgba(255,69,0,0.55), 0 0 80px rgba(94,92,230,0.28); }
         }
         body.tracking #startBtn.huge { display: none; }
         body:not(.tracking) #trackingDisplay,
