@@ -113,6 +113,7 @@
             position: fixed; inset: 0;
             width: 100vw; height: 100vh;
             pointer-events: none; z-index: 2;
+            clip-path: inset(env(safe-area-inset-top, 0) 0 env(safe-area-inset-bottom, 0) 0);
         }
         #trail .trail-line {
             fill: none;
@@ -768,13 +769,20 @@
             return { x, y };
         });
 
-        // Margin from any edge of the screen — leaves room for an indirect wander
-        const margin = 36;
+        // Margin from any edge of the screen — leaves room for an indirect wander.
+        // Add the body's safe-area paddings so the trail ends below the notch
+        // and above the home indicator instead of running behind them.
+        const bodyStyles = getComputedStyle(document.body);
+        const safeTop = parseFloat(bodyStyles.paddingTop) || 0;
+        const safeBottom = parseFloat(bodyStyles.paddingBottom) || 0;
+        const sideMargin = 36;
+        const topMargin = safeTop + 24;
+        const bottomMargin = safeBottom + 24;
         const candidates = [];
-        if (maxX > 0) candidates.push((w - cx - margin) / maxX);
-        if (minX < 0) candidates.push((margin - cx) / minX);    // both negative -> positive
-        if (maxY > 0) candidates.push((h - cy - margin) / maxY);
-        if (minY < 0) candidates.push((margin - cy) / minY);
+        if (maxX > 0) candidates.push((w - cx - sideMargin) / maxX);
+        if (minX < 0) candidates.push((sideMargin - cx) / minX);    // both negative -> positive
+        if (maxY > 0) candidates.push((h - cy - bottomMargin) / maxY);
+        if (minY < 0) candidates.push((topMargin - cy) / minY);
         const scale = candidates.length ? Math.min(...candidates) : 1;
         const ns = 'http://www.w3.org/2000/svg';
         const pts = projected.map(p =>
