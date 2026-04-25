@@ -102,9 +102,41 @@
         }
 
         #trail {
-            width: min(85vw, 380px); height: 90px; margin-top: 14px;
-            border: 1px solid var(--muted); border-radius: 10px;
-            opacity: 0.7;
+            position: fixed; inset: 0;
+            width: 100vw; height: 100vh;
+            pointer-events: none; z-index: 2;
+        }
+        #trail .trail-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+        #trail .you { transition: cx 0.2s linear, cy 0.2s linear; }
+
+        /* layering — rings/arrow underneath, trail above them, UI on top */
+        #compass-wrap { z-index: 1; }
+        #topbar, #startBtn, #trackingDisplay, #quote, #controls {
+            position: relative; z-index: 3;
+        }
+
+        /* Quote (no box) */
+        #quote {
+            margin: 22px auto 8px;
+            padding: 0 18px;
+            max-width: 560px;
+            text-align: center;
+            color: var(--fg);
+            font-style: italic;
+            line-height: 1.35;
+            font-size: clamp(1rem, 4vw, 1.4rem);
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            min-height: 4.4em;
+        }
+        #quote.show { opacity: 0.92; }
+        #quote .author {
+            display: block;
+            margin-top: 8px;
+            font-style: normal;
+            font-size: 0.85em;
+            color: var(--muted);
         }
 
         #controls {
@@ -266,6 +298,8 @@
 </head>
 <body>
 
+<svg id="trail" preserveAspectRatio="none" aria-hidden="true"></svg>
+
 <div id="topbar">
     <button class="chip" id="nightBtn">Night</button>
     <button class="chip" id="sosBtn">Where am I?</button>
@@ -292,9 +326,7 @@
     </div>
 </div>
 
-<svg id="trail" viewBox="-50 -50 100 100" preserveAspectRatio="xMidYMid meet">
-    <circle cx="0" cy="0" r="2" fill="var(--accent)" />
-</svg>
+<div id="quote" role="button" tabindex="0" aria-label="Tap for next quote"></div>
 
 <div id="controls">
     <button class="btn stop" id="stopBtn" type="button">Stop</button>
@@ -384,7 +416,50 @@
     let lastHapticInterval = 0;
     let arrived = false;
 
+    // Quotes — placeholder until user supplies the array
+    const QUOTES = [
+        { text: "Not all those who wander are lost.", author: "J.R.R. Tolkien" },
+        { text: "Wherever you go, there you are.", author: "Jon Kabat-Zinn" },
+        { text: "The desert tells a different story every time one ventures on it.", author: "Robert Edison Fulton Jr." }
+    ];
+    let quoteIndex = -1;
+    let quoteTimer = null;
+    let lastQuoteShown = 0;
+
     const $ = (id) => document.getElementById(id);
+
+    function showRandomQuote() {
+        if (!QUOTES.length) return;
+        const el = $('quote');
+        let next;
+        // pick a quote different from current
+        do { next = Math.floor(Math.random() * QUOTES.length); }
+        while (QUOTES.length > 1 && next === quoteIndex);
+        quoteIndex = next;
+        const q = QUOTES[quoteIndex];
+
+        // fade out -> swap -> fade in
+        el.classList.remove('show');
+        setTimeout(() => {
+            el.innerHTML = '';
+            const t = document.createTextNode('“' + q.text + '”');
+            el.appendChild(t);
+            if (q.author) {
+                const a = document.createElement('span');
+                a.className = 'author';
+                a.textContent = '— ' + q.author;
+                el.appendChild(a);
+            }
+            el.classList.add('show');
+            lastQuoteShown = Date.now();
+        }, 350);
+    }
+
+    function startQuoteRotation() {
+        showRandomQuote();
+        if (quoteTimer) clearInterval(quoteTimer);
+        quoteTimer = setInterval(showRandomQuote, 30000);
+    }
 
     const toRad = (d) => d * Math.PI / 180;
     const toDeg = (r) => r * 180 / Math.PI;
@@ -440,11 +515,26 @@
 
     function updateTrail() {
         const svg = $('trail');
-        // Keep static camp dot, clear old trail lines
         [...svg.querySelectorAll('.tp')].forEach(n => n.remove());
         if (!trailPoints.length) return;
 
-        // Project relative to active destination, using a simple equirectangular scale
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+        svg.setAttribute('width', w);
+        svg.setAttribute('height', h);
+
+        // Destination = visual center of the arrow (center of compass-wrap)
+        const wrapRect = $('compass-wrap').getBoundingClientRect();
+        const cx = wrapRect.left + wrapRect.width / 2;
+        const cy = wrapRect.top + wrapRect.height / 2;
+        // Pick the smaller distance from arrow-center to nearest viewport edge
+        // so the user-dot can reach an edge in any direction without overshooting.
+        const edge = Math.max(
+            40,
+            Math.min(cx, cy, w - cx, h - cy) - 20
+        );
+
         const tgt = activeLocation();
         const latRad = toRad(tgt.lat);
         const mPerDegLat = 111320;
@@ -453,33 +543,35 @@
         let maxR = 1;
         const projected = trailPoints.map(p => {
             const x = (p.lon - tgt.lon) * mPerDegLon;
-            const y = -(p.lat - tgt.lat) * mPerDegLat; // invert y so north is up
+            const y = -(p.lat - tgt.lat) * mPerDegLat; // north up
             const r = Math.hypot(x, y);
             if (r > maxR) maxR = r;
             return { x, y };
         });
 
-        const scale = 45 / maxR;
+        const scale = edge / maxR;
         const ns = 'http://www.w3.org/2000/svg';
-        const pts = projected.map(p => `${(p.x*scale).toFixed(1)},${(p.y*scale).toFixed(1)}`).join(' ');
+        const pts = projected.map(p =>
+            `${(cx + p.x*scale).toFixed(1)},${(cy + p.y*scale).toFixed(1)}`
+        ).join(' ');
+
         const poly = document.createElementNS(ns, 'polyline');
         poly.setAttribute('points', pts);
-        poly.setAttribute('fill', 'none');
-        poly.setAttribute('stroke', 'var(--ring-current, #888)');
-        poly.setAttribute('stroke-width', '1.2');
-        poly.setAttribute('stroke-linejoin', 'round');
-        poly.setAttribute('class', 'tp');
+        poly.setAttribute('class', 'trail-line tp');
+        poly.setAttribute('stroke', 'var(--ring-current, #ff4500)');
         svg.appendChild(poly);
 
         const last = projected[projected.length - 1];
         const you = document.createElementNS(ns, 'circle');
-        you.setAttribute('cx', (last.x*scale).toFixed(1));
-        you.setAttribute('cy', (last.y*scale).toFixed(1));
-        you.setAttribute('r', '2.2');
-        you.setAttribute('fill', 'var(--ring-current, #fff)');
-        you.setAttribute('class', 'tp');
+        you.setAttribute('cx', (cx + last.x*scale).toFixed(1));
+        you.setAttribute('cy', (cy + last.y*scale).toFixed(1));
+        you.setAttribute('r', '6');
+        you.setAttribute('fill', 'var(--ring-current, #ff4500)');
+        you.setAttribute('class', 'tp you');
         svg.appendChild(you);
     }
+
+    window.addEventListener('resize', () => updateTrail());
 
     function celebrate() {
         if (arrived) return;
@@ -740,6 +832,14 @@
         document.body.classList.add('night');
         $('nightBtn').textContent = 'Day';
     }
+
+    $('quote').addEventListener('click', () => {
+        // Tap-to-cycle, but reset 30s timer so it doesn't change again right after a tap
+        if (quoteTimer) clearInterval(quoteTimer);
+        showRandomQuote();
+        quoteTimer = setInterval(showRandomQuote, 30000);
+    });
+    startQuoteRotation();
 
     // ---- Destinations modal ----
     let pendingDeleteId = null;
