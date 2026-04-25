@@ -111,8 +111,20 @@
             width: 100vw; height: 100vh;
             pointer-events: none; z-index: 2;
         }
-        #trail .trail-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
-        #trail .you { transition: cx 0.2s linear, cy 0.2s linear; }
+        #trail .trail-line {
+            fill: none;
+            stroke-width: 3.5;
+            stroke-linejoin: round;
+            stroke-linecap: round;
+            filter: drop-shadow(0 0 3px rgba(0,0,0,0.6));
+        }
+        #trail .you {
+            fill: #fff;
+            stroke: #000;
+            stroke-width: 1.5;
+            transition: cx 0.2s linear, cy 0.2s linear;
+            filter: drop-shadow(0 0 6px rgba(255,255,255,0.6));
+        }
 
         /* layering — rings/arrow underneath, trail above them, UI on top */
         #compass-wrap { z-index: 1; }
@@ -316,7 +328,19 @@
 </head>
 <body>
 
-<svg id="trail" preserveAspectRatio="none" aria-hidden="true"></svg>
+<svg id="trail" preserveAspectRatio="none" aria-hidden="true">
+    <defs>
+        <linearGradient id="rainbow">
+            <stop offset="0%"   stop-color="#ff3b30"/>
+            <stop offset="17%"  stop-color="#ff9500"/>
+            <stop offset="33%"  stop-color="#ffcc00"/>
+            <stop offset="50%"  stop-color="#34c759"/>
+            <stop offset="67%"  stop-color="#00c7be"/>
+            <stop offset="83%"  stop-color="#5e5ce6"/>
+            <stop offset="100%" stop-color="#bf5af2"/>
+        </linearGradient>
+    </defs>
+</svg>
 
 <div id="topbar">
     <button class="chip" id="nightBtn">Night</button>
@@ -588,15 +612,14 @@
         const poly = document.createElementNS(ns, 'polyline');
         poly.setAttribute('points', pts);
         poly.setAttribute('class', 'trail-line tp');
-        poly.setAttribute('stroke', 'var(--ring-current, #ff4500)');
+        poly.setAttribute('stroke', 'url(#rainbow)');
         svg.appendChild(poly);
 
         const last = projected[projected.length - 1];
         const you = document.createElementNS(ns, 'circle');
         you.setAttribute('cx', (cx + last.x*scale).toFixed(1));
         you.setAttribute('cy', (cy + last.y*scale).toFixed(1));
-        you.setAttribute('r', '6');
-        you.setAttribute('fill', 'var(--ring-current, #ff4500)');
+        you.setAttribute('r', '7');
         you.setAttribute('class', 'tp you');
         svg.appendChild(you);
     }
