@@ -537,7 +537,9 @@
     let lastFix = 0;
     let speedSamples = []; // {t, lat, lon}
     let trailPoints = [];  // last N {lat, lon}
-    const TRAIL_MAX = 60;
+    const TRAIL_MAX = 1200;          // upper bound on rendered points
+    const TRAIL_MIN_GAP = 3;         // initial minimum meters between samples
+    let trailGap = TRAIL_MIN_GAP;    // doubles when the buffer fills
 
     const RAINBOW_STOPS = [
         [0.00, [0xff, 0x3b, 0x30]],
@@ -947,9 +949,15 @@
         while (speedSamples.length > 1 && lastFix - speedSamples[0].t > 30000) speedSamples.shift();
 
         const lastPt = trailPoints[trailPoints.length - 1];
-        if (!lastPt || haversine(lastPt.lat, lastPt.lon, userLat, userLon) > 3) {
+        if (!lastPt || haversine(lastPt.lat, lastPt.lon, userLat, userLon) > trailGap) {
             trailPoints.push({ lat: userLat, lon: userLon });
-            if (trailPoints.length > TRAIL_MAX) trailPoints.shift();
+            // When the buffer fills up, halve it (drop every other point) and
+            // double the spacing so older history coarsens gracefully on long
+            // hikes instead of falling off the front of the array.
+            if (trailPoints.length > TRAIL_MAX) {
+                trailPoints = trailPoints.filter((_, i) => i % 2 === 0);
+                trailGap *= 2;
+            }
         }
 
         if (pendingCapture) {
@@ -1046,6 +1054,7 @@
         userLat = null; userLon = null; userAcc = null;
         speedSamples = [];
         trailPoints = [];
+        trailGap = TRAIL_MIN_GAP;
         [...$('trail').querySelectorAll('.tp')].forEach(n => n.remove());
         ['r1','r2','r3'].forEach(id => $(id).classList.remove('active'));
         $('arrow').classList.add('stale');
