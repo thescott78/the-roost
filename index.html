@@ -829,6 +829,13 @@
     }
 
     window.addEventListener('resize', () => updateTrail());
+    window.addEventListener('orientationchange', () => updateTrail());
+    // iOS Safari often doesn't fire resize on background→foreground; force a
+    // re-render so the SVG viewBox matches the current viewport again.
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) updateTrail();
+    });
+    window.addEventListener('pageshow', () => updateTrail());
 
     function celebrate() {
         if (arrived) return;
